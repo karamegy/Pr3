@@ -1,4 +1,4 @@
-name: Build PR3 Studio Pro APK
+name: Build PR3 Studio Pro (Signed APK, AAB & Certificates)
 
 on:
   push:
@@ -18,29 +18,137 @@ jobs:
         with:
           node-version: '20'
 
-      - name: إعداد Java 17 (مطلوب لـ Capacitor 6)
+      - name: إعداد Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: تثبيت حزم Capacitor وتجهيز مجلد الويب
+      - name: تثبيت حزم Capacitor وتجهيز ملفات الويب
         run: |
           npm install
           npm run prepare-web
 
-      - name: إضافة منصة Android ودمج أكواد الجافا
+      - name: حفظ أكواد الجافا وبناء مجلد Android نظيف بالكامل
         run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
-          fi
+          mkdir -p _backup_java
+          find . -maxdepth 8 -name "*.java" -not -path "./node_modules/*" -not -path "./_backup_java/*" -exec cp -f {} _backup_java/ \;
+          rm -rf android
+          npx cap add android
           mkdir -p android/app/src/main/java/io/github/karamegy/pr3
-          cp -f native-src/*.java android/app/src/main/java/io/github/karamegy/pr3/ 2>/dev/null || cp -f *.java android/app/src/main/java/io/github/karamegy/pr3/
+          cp -f _backup_java/*.java android/app/src/main/java/io/github/karamegy/pr3/
+          rm -rf _backup_java
           npx cap sync android
 
-      - name: حقن صلاحيات سامسونج وخدمة الطباعة في AndroidManifest.xml
+      - name: توليد شهادات التوقيع واستخراج البصمتين (SHA-1 & SHA-256)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          python3 - << 'EOF'
+          mkdir -p signing-bundle
+
+          KS_PASS="${KEYSTORE_PASSWORD:-PR3Studio@2026}"
+          K_ALIAS="${KEY_ALIAS:-pr3releasekey}"
+          K_PASS="${KEY_PASSWORD:-PR3Studio@2026}"
+
+          # 1. استعادة الشهادة من Secrets إن وجدت، أو توليد شهادة جديدة للتطبيق الجديد
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > signing-bundle/pr3-release.keystore
+          else
+            keytool -genkeypair -v \
+              -keystore signing-bundle/pr3-release.keystore \
+              -alias "$K_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KS_PASS" \
+              -keypass "$K_PASS" \
+              -dname "CN=Karam Agag, OU=GITI Tech, O=GITI Tech, L=Giza, ST=Giza, C=EG"
+          fi
+
+          # 2. تصدير ملفات الشهادات العامة (PEM & DER) وملف Base64 للأسرار
+          keytool -exportcert -rfc \
+            -keystore signing-bundle/pr3-release.keystore \
+            -alias "$K_ALIAS" \
+            -storepass "$KS_PASS" \
+            -file signing-bundle/deployment_cert.pem
+
+          keytool -exportcert \
+            -keystore signing-bundle/pr3-release.keystore \
+            -alias "$K_ALIAS" \
+            -storepass "$KS_PASS" \
+            -file signing-bundle/deployment_cert.der
+
+          base64 -w 0 signing-bundle/pr3-release.keystore > signing-bundle/keystore_base64.txt
+
+          # 3. تجهيز شهادة Debug لاستخراج بصماتها أيضاً
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          # 4. استخراج البصمتين SHA-1 و SHA-256 لكلا الشهادتين
+          REL_INFO=$(keytool -list -v -keystore signing-bundle/pr3-release.keystore -alias "$K_ALIAS" -storepass "$KS_PASS")
+          DBG_INFO=$(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android)
+
+          REL_SHA1=$(echo "$REL_INFO" | grep "SHA1:" | head -n 1 | awk '{print $2}')
+          REL_SHA256=$(echo "$REL_INFO" | grep "SHA256:" | head -n 1 | awk '{print $2}')
+          DBG_SHA1=$(echo "$DBG_INFO" | grep "SHA1:" | head -n 1 | awk '{print $2}')
+          DBG_SHA256=$(echo "$DBG_INFO" | grep "SHA256:" | head -n 1 | awk '{print $2}')
+
+          cat << EOF > signing-bundle/FINGERPRINTS_AND_SECRETS.txt
+          ============================================================
+          بيانات التوقيع والبصمات - تطبيق PR3 Studio Pro
+          Package Name: io.github.karamegy.pr3
+          ============================================================
+
+          [1] بصمات نسخة الإصدار (Release Keystore - للإنتاج وجوجل بلاي):
+          SHA-1:   $REL_SHA1
+          SHA-256: $REL_SHA256
+
+          [2] بصمات نسخة التطوير (Debug Keystore):
+          SHA-1:   $DBG_SHA1
+          SHA-256: $DBG_SHA256
+
+          [3] بيانات GitHub Secrets (احفظها في Settings > Secrets > Actions):
+          - KEYSTORE_PASSWORD : $KS_PASS
+          - KEY_ALIAS         : $K_ALIAS
+          - KEY_PASSWORD      : $K_PASS
+          - KEYSTORE_BASE64   : (موجود بالكامل داخل ملف keystore_base64.txt المرفق)
+
+          [4] كود assetlinks.json للربط مع موقعك:
+          [{
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+              "namespace": "android_app",
+              "package_name": "io.github.karamegy.pr3",
+              "sha256_cert_fingerprints": ["$REL_SHA256"]
+            }
+          }]
+          EOF
+
+          # عرض البصمات مباشرة في ملخص صفحة GitHub Actions
+          cat << EOF >> $GITHUB_STEP_SUMMARY
+          ### بصمات التوقيع المستخرجة (PR3 Studio Pro)
+          * **Release SHA-1:** \`$REL_SHA1\`
+          * **Release SHA-256:** \`$REL_SHA256\`
+          * **Debug SHA-1:** \`$DBG_SHA1\`
+          * **Debug SHA-256:** \`$DBG_SHA256\`
+          EOF
+
+      - name: حقن صلاحيات سامسونج وخدمة الطباعة وإعداد التوقيع في Android
+        run: |
+          python3 - << 'PYEOF'
           manifest_path = "android/app/src/main/AndroidManifest.xml"
           with open(manifest_path, "r", encoding="utf-8") as f:
               manifest = f.read()
@@ -82,16 +190,55 @@ jobs:
 
           with open(manifest_path, "w", encoding="utf-8") as f:
               f.write(manifest)
-          EOF
 
-      - name: بناء ملف APK
+          gradle_path = "android/app/build.gradle"
+          with open(gradle_path, "r", encoding="utf-8") as f:
+              gradle = f.read()
+
+          signing_block = """
+              signingConfigs {
+                  release {
+                      storeFile file("../../signing-bundle/pr3-release.keystore")
+                      storePassword System.getenv("KEYSTORE_PASSWORD") ?: "PR3Studio@2026"
+                      keyAlias System.getenv("KEY_ALIAS") ?: "pr3releasekey"
+                      keyPassword System.getenv("KEY_PASSWORD") ?: "PR3Studio@2026"
+                  }
+              }
+              buildTypes {"""
+
+          if "signingConfigs" not in gradle:
+              gradle = gradle.replace("buildTypes {", signing_block, 1)
+              gradle = gradle.replace(
+                  "minifyEnabled false",
+                  "signingConfig signingConfigs.release\n            minifyEnabled false",
+                  1
+              )
+
+          with open(gradle_path, "w", encoding="utf-8") as f:
+              f.write(gradle)
+          PYEOF
+
+      - name: بناء الحزم الموقعة (APK Release + AAB Release + APK Debug)
         working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug assembleRelease bundleRelease
 
-      - name: رفع ملف APK الجاهز للتحميل
+      - name: رفع حزم التطبيق (APK & AAB)
         uses: actions/upload-artifact@v4
         with:
-          name: PR3-Studio-Pro-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: PR3-Studio-Pro-Builds
+          path: |
+            android/app/build/outputs/apk/release/app-release.apk
+            android/app/build/outputs/bundle/release/app-release.aab
+            android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: رفع ملفات الشهادات والأسرار والبصمات بالكامل
+        uses: actions/upload-artifact@v4
+        with:
+          name: PR3-Certificates-And-Fingerprints
+          path: signing-bundle/
