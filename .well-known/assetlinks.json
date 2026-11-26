@@ -7,8 +7,7 @@
       "namespace": "android_app",
       "package_name": "io.github.karamegy.pr3",
       "sha256_cert_fingerprints": [
-        "2D:2E:E9:8B:84:0D:7B:5B:67:FD:6B:85:99:73:33:0F:79:E0:5B:9A:32:5F:1C:66:0F:4B:E6:72:48:FD:E0:8D",
-        "D0:CC:C6:41:FB:11:5A:A3:53:94:82:5A:3E:20:02:FE:59:B4:C9:64:A1:CD:9B:6C:B6:B7:44:22:24:92:4E:A7"
+        "2D:2E:E9:8B:84:0D:7B:5B:67:FD:6B:85:99:73:33:0F:79:E0:5B:9A:32:5F:1C:66:0F:4B:E6:72:48:FD:E0:8D"
       ]
     }
   }
