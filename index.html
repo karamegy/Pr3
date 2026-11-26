@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <title>PR3 Thermal Studio Pro | طابعة Intermec PR3</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- تحميل محلي لمكتبة PDF.js للعمل أوفلاين (يتم تجاهلها تلقائياً داخل الأندرويد لصالح محرك PdfRenderer الأصلي) -->
+  <script src="pdf.min.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- الشريط العلوي وحالة الاتصال والبطارية -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="status-dot" id="statusDot"></div>
+        <div>
+          <h1>PR3 Studio Pro</h1>
+          <span class="sub-status" id="connectionStatus">جاري البحث التلقائي عن PR3...</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="telemetry-badge" id="batteryBadge" title="حالة الطابعة">--%</span>
+        <button id="btnTelemetry" class="btn btn-ghost btn-sm" title="فحص البطارية واللغة">فحص</button>
+        <button id="btnConnect" class="btn btn-primary btn-sm">اتصال</button>
+      </div>
+    </header>
+
+    <!-- شريط التحكم السريع: البروتوكول، المعالجة، حرارة الرأس، والقص التلقائي -->
+    <section class="control-bar card">
+      <div class="control-grid">
+        <div class="field">
+          <label for="protocolSelect">لغة أوامر الطابعة</label>
+          <select id="protocolSelect">
+            <option value="ESCP" selected>ESC/P (ESC * 33) - الموصى به</option>
+            <option value="CPCL">CPCL (إعداد المصنع PR3)</option>
+            <option value="ESCPOS">ESC/POS (GS v 0)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="ditherSelect">معالجة الصورة</label>
+          <select id="ditherSelect">
+            <option value="threshold" selected>الحد الحاد (نصوص وفواتير)</option>
+            <option value="floyd">تدرج نقطي (صور وشعارات)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="control-grid">
+        <div class="slider-row">
+          <label for="thresholdRange">التباين (Threshold): <strong id="thresholdVal">127</strong></label>
+          <input type="range" id="thresholdRange" min="60" max="210" value="127" />
+        </div>
+        <div class="slider-row">
+          <label for="darknessRange">حرارة الرأس (التعتيم): <strong id="darknessVal">5</strong>/10</label>
+          <input type="range" id="darknessRange" min="1" max="10" value="5" />
+        </div>
+      </div>
+
+      <div class="toggles-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="autoCropCheck" checked />
+          <span>قص الهوامش</span>
+        </label>
+        <div class="mini-actions">
+          <button id="btnFeed" class="btn btn-ghost btn-xs">تغذية ↕</button>
+          <button id="btnTestPrint" class="btn btn-outline btn-xs">طباعة اختبارية</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- التبويبات الرئيسية -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="receiptTab">إيصال وقوالب</button>
+      <button class="tab" data-tab="fileTab">صورة / PDF</button>
+      <button class="tab" data-tab="settingsTab">الربط التلقائي</button>
+    </nav>
+
+    <!-- تبويب 1: محرر الإيصالات والقوالب المحفوظة والترقيم وQR -->
+    <main id="receiptTab" class="tab-panel active">
+      <div class="card form-card">
+        <!-- شريط القوالب الجاهزة -->
+        <div class="template-bar">
+          <select id="templateSelect" aria-label="اختر قالباً محفوظاً">
+            <option value="">-- اختر قالباً محفوظاً أو اكتب جديداً --</option>
+          </select>
+          <button id="btnSaveTemplate" class="btn btn-outline btn-xs" title="حفظ كنموذج">حفظ قالب</button>
+          <button id="btnDeleteTemplate" class="btn btn-ghost btn-xs" title="حذف القالب المحدد">حذف</button>
+        </div>
+
+        <div class="control-grid">
+          <div class="field">
+            <label for="storeTitle">عنوان المتجر / الترويسة</label>
+            <input type="text" id="storeTitle" placeholder="مثال: مؤسسة الإخلاص" value="مؤسسة الإخلاص" />
+          </div>
+          <div class="field">
+            <label for="storeSub">بيانات فرعية / هاتف</label>
+            <input type="text" id="storeSub" placeholder="العنوان أو الهاتف" value="شبرامنت - الجيزة" />
+          </div>
+        </div>
+
+        <!-- خيارات الترقيم التسلسلي والتاريخ التلقائي -->
+        <div class="toggles-row meta-toggles">
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoNumberCheck" checked />
+            <span>ترقيم تلقائي (#<strong id="nextSeqDisplay">1001</strong>)</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoDateCheck" checked />
+            <span>إضافة التاريخ والوقت</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="receiptBody">نص الفاتورة أو البيان</label>
+          <textarea id="receiptBody" rows="5" placeholder="اكتب الأصناف أو النص العربي هنا...">صنف 1: علف تسمين سوبر - 50 كجم
+الكمية: 2 شيكارة × 950 ج.م
+--------------------------------
+الإجمالي المستحق: 1,900.00 ج.م
+شكراً لتعاملكم معنا</textarea>
+        </div>
+
+        <div class="control-grid">
+          <div class="field">
+            <label for="barcodeInput">باركود خطي (Code 128)</label>
+            <input type="text" id="barcodeInput" placeholder="اتركه فارغاً لإلغائه" value="INV-1001" />
+          </div>
+          <div class="field">
+            <label for="qrInput">رمز QR أوفلاين (رابط أو نص)</label>
+            <input type="text" id="qrInput" placeholder="مثال: رقم الهاتف أو رابط الفاتورة" value="مؤسسة الإخلاص - شبرامنت" />
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="fontSizeRange">حجم خط الفاتورة: <strong id="fontSizeVal">28</strong>px</label>
+          <input type="range" id="fontSizeRange" min="20" max="44" value="28" />
+        </div>
+      </div>
+    </main>
+
+    <!-- تبويب 2: طباعة الصور وملفات PDF أوفلاين -->
+    <main id="fileTab" class="tab-panel">
+      <div class="card form-card">
+        <label class="upload-box" for="fileInput">
+          <input type="file" id="fileInput" accept="image/*,application/pdf" hidden />
+          <div class="upload-icon">📄</div>
+          <div class="upload-title">اختر صورة فاتورة أو ملف PDF</div>
+          <div class="upload-hint">يعمل أوفلاين بالكامل • أو اضغط "مشاركة" من أي تطبيق</div>
+        </label>
+
+        <div id="pdfControls" class="pdf-controls hidden">
+          <button id="prevPage" class="btn btn-ghost btn-xs">السابق</button>
+          <span id="pageIndicator">صفحة 1 من 1</span>
+          <button id="nextPage" class="btn btn-ghost btn-xs">التالي</button>
+          <button id="btnPrintAllPdf" class="btn btn-primary btn-xs">طباعة كل الصفحات</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- تبويب 3: إعدادات الربط التلقائي مع سامسونج -->
+    <main id="settingsTab" class="tab-panel">
+      <div class="card form-card">
+        <h3>الربط التلقائي مع هاتف سامسونج</h3>
+        <ul class="info-list">
+          <li><span>الموديل:</span> <strong>Intermec PR3 (576px / 203 DPI)</strong></li>
+          <li><span>الشريحة:</span> <strong>Bluegiga WT12-A (SPP Classic)</strong></li>
+          <li><span>وضع الاتصال:</span> <strong id="bridgeModeText">فحص تلقائي...</strong></li>
+          <li><span>حالة الورق / اللغة:</span> <strong id="printerDetailText">في انتظار الفحص</strong></li>
+        </ul>
+
+        <div class="field">
+          <label for="deviceMacInput">عنوان MAC للطابعة (يُحفظ تلقائياً عند أول اتصال)</label>
+          <input type="text" id="deviceMacInput" placeholder="00:07:80:XX:XX:XX" />
+        </div>
+
+        <div class="field">
+          <label for="seqCounterInput">بداية الترقيم التسلسلي للفواتير</label>
+          <input type="number" id="seqCounterInput" value="1001" min="1" />
+        </div>
+
+        <div class="toggles-row meta-toggles">
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoConnectBootCheck" checked />
+            <span>اتصال صامت تلقائي عند فتح التطبيق</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoPrintShareCheck" checked />
+            <span>طباعة فورية عند استلام مشاركة</span>
+          </label>
+        </div>
+
+        <div class="btn-row">
+          <button id="btnSaveSettings" class="btn btn-primary">حفظ الإعدادات</button>
+          <button id="btnDownloadRaw" class="btn btn-outline">تصدير الأوامر (.bin)</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- منطقة المعاينة الحرارية الحية (576px) -->
+    <section class="preview-section">
+      <div class="preview-header">
+        <span>معاينة الورق الحراري (576px × <strong id="canvasHeightLabel">0</strong>px)</span>
+        <button id="btnRefreshPreview" class="btn btn-ghost btn-xs">تحديث المعاينة</button>
+      </div>
+      <div class="paper-wrapper">
+        <canvas id="thermalCanvas" width="576" height="320"></canvas>
+      </div>
+    </section>
+
+    <!-- زر الطباعة السفلي الثابت -->
+    <footer class="bottom-bar">
+      <button id="btnPrintNow" class="btn btn-print">
+        <span>طباعة الآن على PR3</span>
+      </button>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
