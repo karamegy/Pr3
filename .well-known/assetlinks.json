@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.karamegy.pr3",
+      "sha256_cert_fingerprints": [
+        "4F:45:FF:A7:55:6E:21:C1:B3:69:E2:AD:53:E1:C6:9E:5B:61:22:24:A7:CC:27:38:7C:36:41:DB:03:E9:96:F9",
+        "2C:71:AD:7A:1D:85:F4:D6:A5:0D:8B:B0:AB:8E:F2:93:A0:30:A3:CC:13:47:53:ED:09:99:6F:DD:A8:55:ED:FC"
+      ]
+    }
+  }
+]
