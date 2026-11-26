@@ -25,7 +25,7 @@ body {
   color: var(--text-main);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Tahoma, Arial, sans-serif;
   line-height: 1.45;
-  padding-bottom: 84px;
+  padding-bottom: 88px;
 }
 
 .app-shell {
@@ -68,7 +68,7 @@ body {
 }
 
 .brand h1 {
-  font-size: 1.08rem;
+  font-size: 1.06rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -132,6 +132,14 @@ label {
   color: var(--text-muted);
 }
 
+code {
+  background: #1a1a1a;
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+}
+
 input[type="text"],
 input[type="number"],
 select,
@@ -182,15 +190,24 @@ input[type="range"] {
   margin-bottom: 10px;
 }
 
-.mini-actions {
+.mini-checks,
+.mini-actions,
+.logo-actions {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.muted-xs {
+  font-size: 0.74rem;
+  color: var(--text-muted);
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   color: var(--text-main);
   font-size: 0.82rem;
   cursor: pointer;
@@ -212,11 +229,39 @@ input[type="range"] {
   border-bottom: 1px solid var(--border);
 }
 
+/* الإضافة السريعة للأصناف */
+.quick-item-box {
+  background: #0f0f0f;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px;
+  margin-bottom: 10px;
+}
+
+.quick-item-title {
+  font-size: 0.76rem;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.quick-item-grid {
+  display: grid;
+  grid-template-columns: 2fr 0.9fr 1.1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.quick-item-grid input {
+  padding: 7px 8px;
+  font-size: 0.84rem;
+}
+
 /* التبويبات */
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
   background: var(--bg-card);
   padding: 5px;
   border-radius: var(--radius);
@@ -228,9 +273,9 @@ input[type="range"] {
   background: transparent;
   color: var(--text-muted);
   border: none;
-  padding: 9px 6px;
+  padding: 9px 4px;
   border-radius: 8px;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
   transition: 0.2s;
@@ -284,6 +329,15 @@ input[type="range"] {
   color: var(--text-muted);
 }
 
+.file-tools-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
 .pdf-controls {
   display: flex;
   justify-content: center;
@@ -297,6 +351,60 @@ input[type="range"] {
 
 .hidden {
   display: none !important;
+}
+
+/* سجل الفواتير */
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.history-header h3 {
+  font-size: 0.95rem;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-info {
+  min-width: 0;
+}
+
+.history-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  padding: 20px 8px;
 }
 
 /* قائمة المعلومات */
@@ -405,24 +513,54 @@ input[type="range"] {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.94);
+  background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(8px);
   border-top: 1px solid var(--border);
-  padding: 10px 14px;
+  padding: 10px 12px;
   display: flex;
   justify-content: center;
   z-index: 50;
 }
 
-.btn-print {
+.bottom-controls {
   width: 100%;
-  max-width: 612px;
+  max-width: 616px;
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.copies-select {
+  background: #141414;
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.btn-print {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(135deg, #00e5ff, #00e676);
   color: #000000;
-  padding: 14px;
-  font-size: 1.05rem;
+  padding: 13px;
+  font-size: 1.02rem;
   border-radius: 10px;
   box-shadow: 0 4px 18px rgba(0, 229, 255, 0.25);
+}
+
+.print-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 0%;
+  background: #000000;
+  transition: width 0.15s ease;
 }
 
 /* الإشعارات */
