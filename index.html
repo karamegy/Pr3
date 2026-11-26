@@ -6,7 +6,6 @@
   <meta name="theme-color" content="#000000" />
   <title>PR3 Thermal Studio Pro | طابعة Intermec PR3</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- تحميل محلي لمكتبة PDF.js للعمل أوفلاين (يتم تجاهلها تلقائياً داخل الأندرويد لصالح محرك PdfRenderer الأصلي) -->
   <script src="pdf.min.js" defer></script>
 </head>
 <body>
@@ -21,20 +20,20 @@
         </div>
       </div>
       <div class="top-actions">
-        <span class="telemetry-badge" id="batteryBadge" title="حالة الطابعة">--%</span>
-        <button id="btnTelemetry" class="btn btn-ghost btn-sm" title="فحص البطارية واللغة">فحص</button>
+        <span class="telemetry-badge" id="batteryBadge" title="حالة البطارية">--%</span>
+        <button id="btnTelemetry" class="btn btn-ghost btn-sm" title="فحص البطارية والورق">فحص</button>
         <button id="btnConnect" class="btn btn-primary btn-sm">اتصال</button>
       </div>
     </header>
 
-    <!-- شريط التحكم السريع: البروتوكول، المعالجة، حرارة الرأس، والقص التلقائي -->
+    <!-- شريط التحكم السريع -->
     <section class="control-bar card">
       <div class="control-grid">
         <div class="field">
           <label for="protocolSelect">لغة أوامر الطابعة</label>
           <select id="protocolSelect">
-            <option value="ESCP" selected>ESC/P (ESC * 33) - الموصى به</option>
-            <option value="CPCL">CPCL (إعداد المصنع PR3)</option>
+            <option value="INTERMEC_ESCP" selected>Intermec PR3 ESC/P (ESC V)</option>
+            <option value="CPCL">Intermec CPCL (CSim)</option>
             <option value="ESCPOS">ESC/POS (GS v 0)</option>
           </select>
         </div>
@@ -49,20 +48,26 @@
 
       <div class="control-grid">
         <div class="slider-row">
-          <label for="thresholdRange">التباين (Threshold): <strong id="thresholdVal">127</strong></label>
-          <input type="range" id="thresholdRange" min="60" max="210" value="127" />
+          <label for="thresholdRange">التباين (Threshold): <strong id="thresholdVal">135</strong></label>
+          <input type="range" id="thresholdRange" min="60" max="210" value="135" />
         </div>
         <div class="slider-row">
-          <label for="darknessRange">حرارة الرأس (التعتيم): <strong id="darknessVal">5</strong>/10</label>
-          <input type="range" id="darknessRange" min="1" max="10" value="5" />
+          <label for="darknessRange">حرارة الرأس (التعتيم): <strong id="darknessVal">6</strong>/10</label>
+          <input type="range" id="darknessRange" min="1" max="10" value="6" />
         </div>
       </div>
 
       <div class="toggles-row">
-        <label class="checkbox-label">
-          <input type="checkbox" id="autoCropCheck" checked />
-          <span>قص الهوامش</span>
-        </label>
+        <div class="mini-checks">
+          <label class="checkbox-label">
+            <input type="checkbox" id="autoCropCheck" checked />
+            <span>قص الهوامش</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="borderFrameCheck" />
+            <span>إطار خارجي</span>
+          </label>
+        </div>
         <div class="mini-actions">
           <button id="btnFeed" class="btn btn-ghost btn-xs">تغذية ↕</button>
           <button id="btnTestPrint" class="btn btn-outline btn-xs">طباعة اختبارية</button>
@@ -72,12 +77,13 @@
 
     <!-- التبويبات الرئيسية -->
     <nav class="tabs">
-      <button class="tab active" data-tab="receiptTab">إيصال وقوالب</button>
+      <button class="tab active" data-tab="receiptTab">إيصال</button>
       <button class="tab" data-tab="fileTab">صورة / PDF</button>
-      <button class="tab" data-tab="settingsTab">الربط التلقائي</button>
+      <button class="tab" data-tab="historyTab">السجل</button>
+      <button class="tab" data-tab="settingsTab">الربط</button>
     </nav>
 
-    <!-- تبويب 1: محرر الإيصالات والقوالب المحفوظة والترقيم وQR -->
+    <!-- تبويب 1: محرر الإيصالات -->
     <main id="receiptTab" class="tab-panel active">
       <div class="card form-card">
         <!-- شريط القوالب الجاهزة -->
@@ -85,8 +91,29 @@
           <select id="templateSelect" aria-label="اختر قالباً محفوظاً">
             <option value="">-- اختر قالباً محفوظاً أو اكتب جديداً --</option>
           </select>
-          <button id="btnSaveTemplate" class="btn btn-outline btn-xs" title="حفظ كنموذج">حفظ قالب</button>
-          <button id="btnDeleteTemplate" class="btn btn-ghost btn-xs" title="حذف القالب المحدد">حذف</button>
+          <button id="btnSaveTemplate" class="btn btn-outline btn-xs">حفظ قالب</button>
+          <button id="btnDeleteTemplate" class="btn btn-ghost btn-xs">حذف</button>
+        </div>
+
+        <!-- شعار المتجر ولغة الإيصال -->
+        <div class="control-grid">
+          <div class="field">
+            <label>شعار المتجر (اختياري)</label>
+            <div class="logo-actions">
+              <label class="btn btn-ghost btn-xs" for="logoInput">اختيار شعار</label>
+              <input type="file" id="logoInput" accept="image/*" hidden />
+              <button type="button" id="btnClearLogo" class="btn btn-ghost btn-xs hidden">إزالة</button>
+              <span id="logoStatusText" class="muted-xs">بدون شعار</span>
+            </div>
+          </div>
+          <div class="field">
+            <label for="receiptLangSelect">لغة واتجاه الفاتورة</label>
+            <select id="receiptLangSelect">
+              <option value="auto" selected>تلقائي حسب النص</option>
+              <option value="ar">عربي (يمين لليسار)</option>
+              <option value="en">English (LTR)</option>
+            </select>
+          </div>
         </div>
 
         <div class="control-grid">
@@ -100,7 +127,7 @@
           </div>
         </div>
 
-        <!-- خيارات الترقيم التسلسلي والتاريخ التلقائي -->
+        <!-- خيارات الترقيم التسلسلي والتاريخ -->
         <div class="toggles-row meta-toggles">
           <label class="checkbox-label">
             <input type="checkbox" id="autoNumberCheck" checked />
@@ -112,12 +139,22 @@
           </label>
         </div>
 
+        <!-- إدراج صنف سريع -->
+        <div class="quick-item-box">
+          <div class="quick-item-title">إضافة صنف سريع (الصنف || السعر)</div>
+          <div class="quick-item-grid">
+            <input type="text" id="quickItemName" placeholder="اسم الصنف" />
+            <input type="number" id="quickItemQty" placeholder="الكمية" value="1" min="0.1" step="any" />
+            <input type="number" id="quickItemPrice" placeholder="السعر" min="0" step="any" />
+            <button type="button" id="btnAddQuickItem" class="btn btn-primary btn-xs">+ إدراج</button>
+          </div>
+        </div>
+
         <div class="field">
-          <label for="receiptBody">نص الفاتورة أو البيان</label>
-          <textarea id="receiptBody" rows="5" placeholder="اكتب الأصناف أو النص العربي هنا...">صنف 1: علف تسمين سوبر - 50 كجم
-الكمية: 2 شيكارة × 950 ج.م
+          <label for="receiptBody">نص الفاتورة (استخدم <code>||</code> لمحاذاة السعر يساراً)</label>
+          <textarea id="receiptBody" rows="5" placeholder="اكتب الأصناف أو النص هنا...">علف تسمين سوبر 50 كجم (2 × 950) || 1,900.00 ج.م
 --------------------------------
-الإجمالي المستحق: 1,900.00 ج.م
+الإجمالي المستحق || 1,900.00 ج.م
 شكراً لتعاملكم معنا</textarea>
         </div>
 
@@ -133,8 +170,8 @@
         </div>
 
         <div class="slider-row">
-          <label for="fontSizeRange">حجم خط الفاتورة: <strong id="fontSizeVal">28</strong>px</label>
-          <input type="range" id="fontSizeRange" min="20" max="44" value="28" />
+          <label for="fontSizeRange">حجم خط الفاتورة: <strong id="fontSizeVal">26</strong>px</label>
+          <input type="range" id="fontSizeRange" min="20" max="42" value="26" />
         </div>
       </div>
     </main>
@@ -149,6 +186,11 @@
           <div class="upload-hint">يعمل أوفلاين بالكامل • أو اضغط "مشاركة" من أي تطبيق</div>
         </label>
 
+        <div class="file-tools-row">
+          <button type="button" id="btnRotateImg" class="btn btn-outline btn-xs">تدوير 90° ↻</button>
+          <span class="muted-xs">مناسب للفواتير العرضية ولقطات الشاشة</span>
+        </div>
+
         <div id="pdfControls" class="pdf-controls hidden">
           <button id="prevPage" class="btn btn-ghost btn-xs">السابق</button>
           <span id="pageIndicator">صفحة 1 من 1</span>
@@ -158,7 +200,20 @@
       </div>
     </main>
 
-    <!-- تبويب 3: إعدادات الربط التلقائي مع سامسونج -->
+    <!-- تبويب 3: سجل الطباعة -->
+    <main id="historyTab" class="tab-panel">
+      <div class="card form-card">
+        <div class="history-header">
+          <h3>آخر الفواتير المطبوعة</h3>
+          <button type="button" id="btnClearHistory" class="btn btn-ghost btn-xs">مسح السجل</button>
+        </div>
+        <div id="historyList" class="history-list">
+          <div class="empty-state">لا توجد فواتير مطبوعة في السجل بعد</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- تبويب 4: إعدادات الربط التلقائي -->
     <main id="settingsTab" class="tab-panel">
       <div class="card form-card">
         <h3>الربط التلقائي مع هاتف سامسونج</h3>
@@ -169,14 +224,15 @@
           <li><span>حالة الورق / اللغة:</span> <strong id="printerDetailText">في انتظار الفحص</strong></li>
         </ul>
 
-        <div class="field">
-          <label for="deviceMacInput">عنوان MAC للطابعة (يُحفظ تلقائياً عند أول اتصال)</label>
-          <input type="text" id="deviceMacInput" placeholder="00:07:80:XX:XX:XX" />
-        </div>
-
-        <div class="field">
-          <label for="seqCounterInput">بداية الترقيم التسلسلي للفواتير</label>
-          <input type="number" id="seqCounterInput" value="1001" min="1" />
+        <div class="control-grid">
+          <div class="field">
+            <label for="deviceMacInput">عنوان MAC للطابعة</label>
+            <input type="text" id="deviceMacInput" placeholder="88:6B:0F:AF:F8:4F" />
+          </div>
+          <div class="field">
+            <label for="seqCounterInput">الرقم التسلسلي القادم</label>
+            <input type="number" id="seqCounterInput" value="1001" min="1" />
+          </div>
         </div>
 
         <div class="toggles-row meta-toggles">
@@ -200,19 +256,32 @@
     <!-- منطقة المعاينة الحرارية الحية (576px) -->
     <section class="preview-section">
       <div class="preview-header">
-        <span>معاينة الورق الحراري (576px × <strong id="canvasHeightLabel">0</strong>px)</span>
-        <button id="btnRefreshPreview" class="btn btn-ghost btn-xs">تحديث المعاينة</button>
+        <span>معاينة الورق (576px × <strong id="canvasHeightLabel">0</strong>px)</span>
+        <div class="mini-actions">
+          <button id="btnSavePng" class="btn btn-ghost btn-xs">حفظ PNG</button>
+          <button id="btnRefreshPreview" class="btn btn-ghost btn-xs">تحديث</button>
+        </div>
       </div>
       <div class="paper-wrapper">
         <canvas id="thermalCanvas" width="576" height="320"></canvas>
       </div>
     </section>
 
-    <!-- زر الطباعة السفلي الثابت -->
+    <!-- شريط الطباعة السفلي الثابت -->
     <footer class="bottom-bar">
-      <button id="btnPrintNow" class="btn btn-print">
-        <span>طباعة الآن على PR3</span>
-      </button>
+      <div class="bottom-controls">
+        <select id="copiesQuickSelect" class="copies-select" aria-label="عدد النسخ" title="عدد النسخ">
+          <option value="1" selected>1× نسخة</option>
+          <option value="2">2× نسختان</option>
+          <option value="3">3× نسخ</option>
+          <option value="4">4× نسخ</option>
+          <option value="5">5× نسخ</option>
+        </select>
+        <button id="btnPrintNow" class="btn btn-print">
+          <span id="printBtnLabel">طباعة الآن على PR3</span>
+          <span id="printProgressBar" class="print-progress"></span>
+        </button>
+      </div>
     </footer>
   </div>
 
