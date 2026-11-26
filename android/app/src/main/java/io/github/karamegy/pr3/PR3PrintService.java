@@ -1,9 +1,14 @@
 package io.github.karamegy.pr3;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.pdf.PdfRenderer;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.print.PrintAttributes;
 import android.print.PrinterCapabilitiesInfo;
@@ -13,12 +18,14 @@ import android.printservice.PrintDocument;
 import android.printservice.PrintJob;
 import android.printservice.PrintService;
 import android.printservice.PrinterDiscoverySession;
+import androidx.core.content.ContextCompat;
 import java.io.ByteArrayOutputStream;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class PR3PrintService extends PrintService {
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     protected PrinterDiscoverySession onCreatePrinterDiscoverySession() {
@@ -55,46 +62,66 @@ public class PR3PrintService extends PrintService {
 
     @Override
     protected void onPrintJobQueued(PrintJob printJob) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            printJob.fail("يرجى فتح التطبيق ومنح إذن البلوتوث أولاً");
+            return;
+        }
+
         printJob.start();
+        PrintDocument doc = printJob.getDocument();
+        final ParcelFileDescriptor pfd = (doc != null) ? doc.getData() : null;
+
+        if (pfd == null) {
+            printJob.fail("ملف الطباعة فارغ");
+            return;
+        }
+
         new Thread(() -> {
+            PdfRenderer renderer = null;
             try {
-                PrintDocument doc = printJob.getDocument();
-                ParcelFileDescriptor pfd = doc.getData();
-                if (pfd == null) {
-                    printJob.fail("ملف الطباعة فارغ");
-                    return;
-                }
-
-                PdfRenderer renderer = new PdfRenderer(pfd);
+                renderer = new PdfRenderer(pfd);
                 int width = 576;
+                int pageCount = renderer.getPageCount();
 
-                for (int i = 0; i < renderer.getPageCount(); i++) {
+                for (int i = 0; i < pageCount; i++) {
                     PdfRenderer.Page page = renderer.openPage(i);
-                    int height = Math.round((float) page.getHeight() * width / page.getWidth());
+                    int height = Math.max(1, Math.round((float) page.getHeight() * width / page.getWidth()));
                     Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                     Canvas canvas = new Canvas(bmp);
                     canvas.drawColor(Color.WHITE);
                     page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT);
                     page.close();
 
-                    byte[] escpPayload = encodeBitmapToEscP(bmp);
-                    PR3PrinterPlugin.writeChunked(escpPayload, "");
+                    byte[] escpPayload = encodeBitmapToIntermecEscP(bmp);
                     bmp.recycle();
+                    PR3PrinterPlugin.writeChunked(escpPayload, "");
                 }
 
-                renderer.close();
-                pfd.close();
-                printJob.complete();
-            } catch (Exception e) {
-                printJob.fail("فشل الاتصال بطابعة PR3: " + e.getMessage());
+                mainHandler.post(() -> {
+                    if (printJob.isStarted()) {
+                        printJob.complete();
+                    }
+                });
+            } catch (Throwable t) {
+                final String msg = t.getMessage() != null ? t.getMessage() : "خطأ غير متوقع أثناء الطباعة";
+                mainHandler.post(() -> {
+                    if (!printJob.isCompleted() && !printJob.isFailed() && !printJob.isCancelled()) {
+                        printJob.fail("فشل الطباعة على PR3: " + msg);
+                    }
+                });
+            } finally {
+                try { if (renderer != null) renderer.close(); } catch (Exception ignored) {}
+                try { pfd.close(); } catch (Exception ignored) {}
             }
         }).start();
     }
 
-    // تحويل الصفحة مباشرة إلى ESC/P (ESC * 33) مع قص الهوامش البيضاء
-    private byte[] encodeBitmapToEscP(Bitmap bmp) {
+    // التشفير الأصلي لطابعة Intermec PR3 (الأمر ESC V nL nH بعرض 576px = 72 بايت لكل صف)
+    private byte[] encodeBitmapToIntermecEscP(Bitmap bmp) {
         int w = bmp.getWidth();
         int h = bmp.getHeight();
+        int bytesPerRow = w / 8; // 72 bytes
         int[] pixels = new int[w * h];
         bmp.getPixels(pixels, 0, w, 0, 0, w, h);
 
@@ -104,7 +131,7 @@ public class PR3PrintService extends PrintService {
             for (int x = 0; x < w; x++) {
                 int px = pixels[y * w + x];
                 int lum = (((px >> 16) & 0xFF) * 30 + ((px >> 8) & 0xFF) * 59 + (px & 0xFF) * 11) / 100;
-                if (lum < 140) {
+                if (lum < 150) {
                     mono[y * w + x] = 1;
                     lastBlackY = y;
                 }
@@ -113,28 +140,35 @@ public class PR3PrintService extends PrintService {
 
         int trimmedH = Math.min(h, lastBlackY + 24);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.write(0x1B); out.write(0x40);
-        out.write(0x1B); out.write(0x33); out.write(0x18);
+        out.write(0x1B);
+        out.write(0x40); // تهيئة PR3
 
-        int nL = w & 0xFF;
-        int nH = (w >> 8) & 0xFF;
+        int bandRows = 200;
+        for (int yStart = 0; yStart < trimmedH; yStart += bandRows) {
+            int bandHeight = Math.min(bandRows, trimmedH - yStart);
+            out.write(0x1B);
+            out.write(0x56); // ESC V
+            out.write(bandHeight & 0xFF);
+            out.write((bandHeight >> 8) & 0xFF);
 
-        for (int y = 0; y < trimmedH; y += 24) {
-            out.write(0x1B); out.write(0x2A); out.write(0x21);
-            out.write(nL); out.write(nH);
-            for (int x = 0; x < w; x++) {
-                for (int k = 0; k < 3; k++) {
-                    int slice = 0;
-                    for (int b = 0; b < 8; b++) {
-                        int py = y + k * 8 + b;
-                        if (py < trimmedH && mono[py * w + x] == 1) slice |= (1 << (7 - b));
+            for (int r = 0; r < bandHeight; r++) {
+                int y = yStart + r;
+                for (int bx = 0; bx < bytesPerRow; bx++) {
+                    int byteVal = 0;
+                    for (int bit = 0; bit < 8; bit++) {
+                        if (mono[y * w + bx * 8 + bit] == 1) {
+                            byteVal |= (1 << (7 - bit));
+                        }
                     }
-                    out.write(slice);
+                    out.write(byteVal);
                 }
             }
-            out.write(0x0A);
         }
-        out.write(0x1B); out.write(0x64); out.write(0x04);
+
+        // تمرير الورق بعد نهاية الصفحة
+        out.write(0x1B);
+        out.write(0x4A);
+        out.write(0x48);
         return out.toByteArray();
     }
 }
