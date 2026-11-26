@@ -53,7 +53,6 @@ jobs:
           K_ALIAS="${KEY_ALIAS:-pr3releasekey}"
           K_PASS="${KEY_PASSWORD:-PR3Studio@2026}"
 
-          # 1. استعادة الشهادة من Secrets إن وجدت، أو توليد شهادة جديدة للتطبيق الجديد
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 -d > signing-bundle/pr3-release.keystore
           else
@@ -68,10 +67,8 @@ jobs:
               -dname "CN=Karam Agag, OU=GITI Tech, O=GITI Tech, L=Giza, ST=Giza, C=EG"
           fi
 
-          # نسخ الشهادة مباشرة داخل مجلد التطبيق لضمان قراءتها أثناء التوقيع
           cp -f signing-bundle/pr3-release.keystore android/app/pr3-release.keystore
 
-          # 2. تصدير ملفات الشهادات العامة (PEM & DER) وملف Base64 للأسرار
           keytool -exportcert -rfc \
             -keystore signing-bundle/pr3-release.keystore \
             -alias "$K_ALIAS" \
@@ -86,7 +83,6 @@ jobs:
 
           base64 -w 0 signing-bundle/pr3-release.keystore > signing-bundle/keystore_base64.txt
 
-          # 3. تجهيز شهادة Debug لاستخراج بصماتها أيضاً
           mkdir -p ~/.android
           if [ ! -f ~/.android/debug.keystore ]; then
             keytool -genkeypair -v \
@@ -100,7 +96,6 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-          # 4. استخراج البصمتين SHA-1 و SHA-256 لكلا الشهادتين
           REL_INFO=$(keytool -list -v -keystore signing-bundle/pr3-release.keystore -alias "$K_ALIAS" -storepass "$KS_PASS")
           DBG_INFO=$(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android)
 
@@ -204,7 +199,7 @@ jobs:
               }
               signingConfigs {
                   release {
-                      storeFile file("pr3-release.keystore")
+                      storeFile rootProject.file("app/pr3-release.keystore")
                       storePassword System.getenv("KEYSTORE_PASSWORD") ?: "PR3Studio@2026"
                       keyAlias System.getenv("KEY_ALIAS") ?: "pr3releasekey"
                       keyPassword System.getenv("KEY_PASSWORD") ?: "PR3Studio@2026"
@@ -238,10 +233,24 @@ jobs:
       - name: عرض سبب الخطأ مباشرة إن وجد
         if: failure()
         run: |
-          echo "### تفاصيل خطأ البناء" >> $GITHUB_STEP_SUMMARY
-          echo '```text' >> $GITHUB_STEP_SUMMARY
-          grep -E "(error:|FAILURE:|What went wrong:|Execution failed)" -A 6 gradle_build.log | tail -n 45 >> $GITHUB_STEP_SUMMARY \vert{}\vert{} tail -n 45 gradle_build.log >>$GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          python3 - << 'PYEOF'
+          import os, re
+          log_path = "gradle_build.log"
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "")
+          if os.path.exists(log_path):
+              with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                  lines = f.readlines()
+              important = []
+              for i, line in enumerate(lines):
+                  if re.search(r"(error:|FAILURE:|What went wrong:|Execution failed|Caused by:)", line):
+                      important.extend(lines[max(0, i-1):min(len(lines), i+5)])
+              output = "".join(important[-60:]) if important else "".join(lines[-60:])
+              print("=== ERROR DETAILS ===")
+              print(output)
+              if summary_path:
+                  with open(summary_path, "a", encoding="utf-8") as s:
+                      s.write("\n### تفاصيل خطأ البناء\n```text\n" + output + "\n```\n")
+          PYEOF
 
       - name: رفع حزم التطبيق (APK & AAB)
         uses: actions/upload-artifact@v4
