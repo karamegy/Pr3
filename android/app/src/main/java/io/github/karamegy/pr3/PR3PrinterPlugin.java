@@ -66,13 +66,11 @@ public class PR3PrinterPlugin extends Plugin {
         connectedName = device.getName() != null ? device.getName() : "Intermec PR3";
     }
 
-    // إرسال البيانات على دفعات 512 بايت لحماية ذاكرة شريحة WT12-A من الامتلاء
     public static synchronized void writeChunked(byte[] bytes, String targetMac) throws Exception {
         try {
             ensureConnected(targetMac);
             sendPaced(bytes);
         } catch (Exception firstError) {
-            // إعادة محاولة صامتة إذا دخلت الطابعة في وضع السكون
             closeQuietly();
             ensureConnected(targetMac);
             sendPaced(bytes);
@@ -136,7 +134,6 @@ public class PR3PrinterPlugin extends Plugin {
         });
     }
 
-    // قراءة ثنائية الاتجاه للبطارية ولغة الطابعة (CPCL vs ESC/P)
     @PluginMethod
     public void getTelemetry(PluginCall call) {
         String mac = call.getString("mac", "");
@@ -145,7 +142,6 @@ public class PR3PrinterPlugin extends Plugin {
                 ensureConnected(mac);
                 while (sharedIn.available() > 0) sharedIn.read();
 
-                // استعلام حالة CPCL ثم حالة ESC/P
                 sharedOut.write("{!\r\n".getBytes(StandardCharsets.US_ASCII));
                 sharedOut.flush();
                 Thread.sleep(250);
@@ -184,7 +180,6 @@ public class PR3PrinterPlugin extends Plugin {
         });
     }
 
-    // تحويل أي صفحة PDF إلى صورة 576px أوفلاين تماماً باستخدام محرك أندرويد الأصلي
     @PluginMethod
     public void renderPdfPage(PluginCall call) {
         String path = call.getString("path");
