@@ -29,33 +29,47 @@ jobs:
           npm install
           npm run prepare-web
 
-      - name: نسخ أكواد الجافا بأمان وبناء مجلد Android نظيف
+      - name: تنظيف أكواد الجافا وبناء مجلد Android نظيف
         run: |
-          mkdir -p _backup_java
-
-          # 1. نسخ ملفات الجافا القديمة من مجلد android أولاً (إن وجدت)
-          if [ -d "android/app/src/main/java" ]; then
-            find android/app/src/main/java -name "*.java" -exec cp -f {} _backup_java/ \;
-          fi
-
-          # 2. نسخ ملفات الجافا الأحدث من المجلد الرئيسي أو src لتأخذ الأولوية وتستبدل القديم
-          find . -maxdepth 2 -name "*.java" -not -path "./node_modules/*" -not -path "./_backup_java/*" -not -path "./android/*" -exec cp -f {} _backup_java/ \;
-
-          # 3. توحيد سطر package في كل ملفات الجافا لمنع أي تعارض
           python3 - << 'PYEOF'
-          import glob, re
-          for path in glob.glob("_backup_java/*.java"):
-              with open(path, "r", encoding="utf-8") as f:
+          import os, re, shutil
+
+          os.makedirs("_backup_java", exist_ok=True)
+
+          # جمع ملفات الجافا بالترتيب: مجلد android القديم أولاً ثم المجلد الرئيسي الأحدث
+          sources = []
+          for root_dir in ["android/app/src/main/java", "."]:
+              if not os.path.exists(root_dir):
+                  continue
+              for r, dirs, files in os.walk(root_dir):
+                  if root_dir == "." and any(x in r for x in ["node_modules", "_backup_java", "android", ".git"]):
+                      continue
+                  for fn in files:
+                      clean_fn = re.sub(r'[^A-Za-z0-9_.]', '', fn)
+                      if clean_fn.endswith(".java"):
+                          sources.append((os.path.join(r, fn), clean_fn))
+
+          for full_path, clean_fn in sources:
+              with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                   code = f.read()
+
+              # إزالة أي حروف اتجاه أو مسافات صفرية مخفية من الكود
+              code = re.sub(r'[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]', '', code)
+
+              # توحيد سطر package
               if re.search(r'^\s*package\s+[\w.]+;', code, flags=re.M):
                   code = re.sub(r'^\s*package\s+[\w.]+;', 'package io.github.karamegy.pr3;', code, count=1, flags=re.M)
               else:
                   code = 'package io.github.karamegy.pr3;\n\n' + code
-              with open(path, "w", encoding="utf-8") as f:
+
+              # مطابقة اسم الملف مع اسم public class الفعلي داخل الكود
+              m = re.search(r'\bpublic\s+(?:final\s+|abstract\s+)?class\s+([A-Za-z0-9_]+)', code)
+              target_name = f"{m.group(1)}.java" if m else clean_fn
+
+              with open(os.path.join("_backup_java", target_name), "w", encoding="utf-8") as f:
                   f.write(code)
           PYEOF
 
-          # 4. إنشاء مشروع أندرويد نظيف وإزالة أي MainActivity مكرر يولده Capacitor
           rm -rf android
           npx cap add android
           rm -rf android/app/src/main/java
@@ -130,7 +144,7 @@ jobs:
 
           cat << EOF > signing-bundle/FINGERPRINTS_AND_SECRETS.txt
           ============================================================
-          بيانات التوقيع والبصمات - تطبيق PR3 Studio Pro
+          بيانات التوقيع والبصمتات - تطبيق PR3 Studio Pro
           Package Name: io.github.karamegy.pr3
           ============================================================
 
