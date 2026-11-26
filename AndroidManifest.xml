@@ -1,0 +1,24 @@
+<!-- صلاحيات البلوتوث لهواتف سامسونج أندرويد 12 فأحدث -->
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+
+<!-- داخل <activity android:name=".MainActivity"> أضف فلاتر المشاركة -->
+<intent-filter>
+    <action android:name="android.intent.action.SEND" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <data android:mimeType="image/*" />
+    <data android:mimeType="application/pdf" />
+    <data android:mimeType="text/plain" />
+</intent-filter>
+
+<!-- داخل <application> أضف خدمة الطباعة التلقائية لنظام سامسونج -->
+<service
+    android:name=".PR3PrintService"
+    android:exported="true"
+    android:permission="android.permission.BIND_PRINT_SERVICE">
+    <intent-filter>
+        <action android:name="android.printservice.PrintService" />
+    </intent-filter>
+</service>
