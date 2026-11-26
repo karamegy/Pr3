@@ -227,30 +227,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          set -o pipefail
-          ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace 2>&1 | tee ../gradle_build.log
-
-      - name: عرض سبب الخطأ مباشرة إن وجد
-        if: failure()
-        run: |
-          python3 - << 'PYEOF'
-          import os, re
-          log_path = "gradle_build.log"
-          summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "")
-          if os.path.exists(log_path):
-              with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                  lines = f.readlines()
-              important = []
-              for i, line in enumerate(lines):
-                  if re.search(r"(error:|FAILURE:|What went wrong:|Execution failed|Caused by:)", line):
-                      important.extend(lines[max(0, i-1):min(len(lines), i+5)])
-              output = "".join(important[-60:]) if important else "".join(lines[-60:])
-              print("=== ERROR DETAILS ===")
-              print(output)
-              if summary_path:
-                  with open(summary_path, "a", encoding="utf-8") as s:
-                      s.write("\n### تفاصيل خطأ البناء\n```text\n" + output + "\n```\n")
-          PYEOF
+          ./gradlew assembleDebug assembleRelease bundleRelease
 
       - name: رفع حزم التطبيق (APK & AAB)
         uses: actions/upload-artifact@v4
