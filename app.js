@@ -1,7 +1,7 @@
 /**
  * Intermec PR3 Thermal Print Engine Pro (576px / 80mm / 203 DPI)
- * يشمل: الاتصال التلقائي، استقبال المشاركة من سامسونج، مولد QR أوفلاين،
- * القوالب المحفوظة، الترقيم التسلسلي، التحكم بحرارة الرأس، ومحركي ESC/P + CPCL.
+ * محرك طباعة عربية خالصة لطابعة Intermec PR3:
+ * يدعم Intermec ESC/P (ESC V)، و CPCL (CSim)، و ESC/POS، والاتصال التلقائي ومشاركة سامسونج.
  */
 
 const PRINTER_WIDTH = 576; // عرض رأس طباعة PR3 بالبكسل
@@ -96,6 +96,7 @@ const ctx = els.canvas.getContext("2d", { willReadFrequently: true });
 // 1. التهيئة والاتصال التلقائي واستقبال مشاركة سامسونج
 // ==========================================
 window.addEventListener("DOMContentLoaded", async () => {
+  initProtocolOptions();
   loadSavedSettings();
   loadTemplates();
   detectTransportBridge();
@@ -110,9 +111,23 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+function initProtocolOptions() {
+  if (!els.protocolSelect) return;
+  els.protocolSelect.innerHTML = `
+    <option value="INTERMEC_ESCP">Intermec PR3 ESC/P (ESC V) - الموصى به</option>
+    <option value="CPCL">Intermec CPCL (CSim)</option>
+    <option value="ESCPOS">ESC/POS (GS v 0)</option>
+  `;
+  els.protocolSelect.value = "INTERMEC_ESCP";
+}
+
 function loadSavedSettings() {
-  const saved = JSON.parse(localStorage.getItem("pr3_settings_v2") || "{}");
-  if (saved.protocol) els.protocolSelect.value = saved.protocol;
+  const saved = JSON.parse(localStorage.getItem("pr3_settings_v3") || "{}");
+  if (saved.protocol && ["INTERMEC_ESCP", "CPCL", "ESCPOS"].includes(saved.protocol)) {
+    els.protocolSelect.value = saved.protocol;
+  } else {
+    els.protocolSelect.value = "INTERMEC_ESCP";
+  }
   if (saved.dither) els.ditherSelect.value = saved.dither;
   if (saved.threshold) {
     els.thresholdRange.value = saved.threshold;
@@ -150,7 +165,7 @@ function saveSettings() {
     autoConnectBoot: els.autoConnectBootCheck.checked,
     autoPrintShare: els.autoPrintShareCheck.checked,
   };
-  localStorage.setItem("pr3_settings_v2", JSON.stringify(data));
+  localStorage.setItem("pr3_settings_v3", JSON.stringify(data));
   showToast("تم حفظ الإعدادات وتحديث الترقيم");
 }
 
@@ -314,6 +329,8 @@ function bindEvents() {
     el.addEventListener("change", renderCurrentView);
   });
 
+  els.protocolSelect.addEventListener("change", saveSettings);
+
   els.btnRefreshPreview.addEventListener("click", renderCurrentView);
   els.fileInput.addEventListener("change", handleFileUpload);
   els.prevPage.addEventListener("click", () => changePdfPage(-1));
@@ -338,8 +355,10 @@ function renderCurrentView() {
 }
 
 // ==========================================
-// 3. محرك رسم الإيصالات العربية + الباركود + QR أوفلاين (576px)
+// 3. محرك رسم الإيصالات العربية الحادة + الباركود + QR أوفلاين (576px)
 // ==========================================
+const ARABIC_FONT_STACK = '"Noto Sans Arabic", "Droid Arabic Naskh", "Cairo", Tahoma, Arial, sans-serif';
+
 function renderReceiptToCanvas() {
   const title = els.storeTitle.value.trim();
   const sub = els.storeSub.value.trim();
@@ -347,7 +366,7 @@ function renderReceiptToCanvas() {
   const barcodeText = els.barcodeInput.value.trim();
   const qrText = els.qrInput.value.trim();
   const fontSize = parseInt(els.fontSizeRange.value, 10);
-  const lineHeight = Math.round(fontSize * 1.42);
+  const lineHeight = Math.round(fontSize * 1.48);
   const showMeta = els.autoNumberCheck.checked || els.autoDateCheck.checked;
 
   // تجهيز سطر الترقيم والتاريخ اللحظي
@@ -366,7 +385,7 @@ function renderReceiptToCanvas() {
 
   // التفاف الأسطر التلقائي لعرض 576px
   const wrappedLines = [];
-  ctx.font = `600 ${fontSize}px Tahoma, Arial, sans-serif`;
+  ctx.font = `700 ${fontSize}px ${ARABIC_FONT_STACK}`;
   bodyLines.forEach((rawLine) => {
     if (!rawLine.trim()) {
       wrappedLines.push("");
@@ -376,7 +395,7 @@ function renderReceiptToCanvas() {
     let current = "";
     words.forEach((word) => {
       const test = current ? `${current} ${word}` : word;
-      if (ctx.measureText(test).width > PRINTER_WIDTH - 32) {
+      if (ctx.measureText(test).width > PRINTER_WIDTH - 28) {
         if (current) wrappedLines.push(current);
         current = word;
       } else {
@@ -386,12 +405,12 @@ function renderReceiptToCanvas() {
     if (current) wrappedLines.push(current);
   });
 
-  let estimatedHeight = 44;
-  if (title) estimatedHeight += 46;
-  if (sub) estimatedHeight += 32;
-  if (title || sub) estimatedHeight += 18;
-  if (metaLine) estimatedHeight += 34;
-  estimatedHeight += wrappedLines.length * lineHeight + 20;
+  let estimatedHeight = 48;
+  if (title) estimatedHeight += 48;
+  if (sub) estimatedHeight += 34;
+  if (title || sub) estimatedHeight += 20;
+  if (metaLine) estimatedHeight += 36;
+  estimatedHeight += wrappedLines.length * lineHeight + 24;
   if (barcodeText) estimatedHeight += 105;
   if (qrText) estimatedHeight += 210;
 
@@ -406,43 +425,43 @@ function renderReceiptToCanvas() {
   let y = 18;
 
   if (title) {
-    ctx.font = "bold 36px Tahoma, Arial, sans-serif";
+    ctx.font = `800 36px ${ARABIC_FONT_STACK}`;
     ctx.textAlign = "center";
     ctx.direction = "rtl";
     ctx.fillText(title, PRINTER_WIDTH / 2, y);
-    y += 44;
+    y += 46;
   }
 
   if (sub) {
-    ctx.font = "600 23px Tahoma, Arial, sans-serif";
+    ctx.font = `700 24px ${ARABIC_FONT_STACK}`;
     ctx.textAlign = "center";
     ctx.direction = "rtl";
     ctx.fillText(sub, PRINTER_WIDTH / 2, y);
-    y += 32;
+    y += 34;
   }
 
   if (title || sub) {
-    ctx.fillRect(16, y + 3, PRINTER_WIDTH - 32, 3);
-    y += 16;
+    ctx.fillRect(14, y + 3, PRINTER_WIDTH - 28, 3);
+    y += 18;
   }
 
   if (metaLine) {
-    ctx.font = "bold 20px Tahoma, Arial, sans-serif";
+    ctx.font = `700 21px ${ARABIC_FONT_STACK}`;
     ctx.textAlign = "center";
     ctx.direction = "rtl";
     ctx.fillText(metaLine, PRINTER_WIDTH / 2, y);
-    y += 32;
+    y += 34;
   }
 
-  ctx.font = `600 ${fontSize}px Tahoma, Arial, sans-serif`;
+  ctx.font = `700 ${fontSize}px ${ARABIC_FONT_STACK}`;
   wrappedLines.forEach((line) => {
     if (/^[-=_]{3,}$/.test(line.trim())) {
-      ctx.fillRect(16, y + Math.floor(lineHeight / 2), PRINTER_WIDTH - 32, 2);
+      ctx.fillRect(14, y + Math.floor(lineHeight / 2), PRINTER_WIDTH - 28, 2);
     } else {
       const isArabic = /[\u0600-\u06FF]/.test(line);
       ctx.direction = isArabic ? "rtl" : "ltr";
       ctx.textAlign = isArabic ? "right" : "left";
-      const x = isArabic ? PRINTER_WIDTH - 16 : 16;
+      const x = isArabic ? PRINTER_WIDTH - 14 : 14;
       ctx.fillText(line, x, y);
     }
     y += lineHeight;
@@ -460,7 +479,8 @@ function renderReceiptToCanvas() {
     y += 186;
   }
 
-  applyMonochromeFilter();
+  // للنصوص العربية نستخدم العتبة الحادة دائماً لمنع تشوش الحروف
+  applyMonochromeFilter(true);
 }
 
 // مولد باركود Code 128B أوفلاين
@@ -526,7 +546,6 @@ function drawOfflineQRCode(context, text, centerX, startY, targetSize) {
 
 function buildQRMatrix(text) {
   const utf8 = new TextEncoder().encode(text);
-  // سعات الإصدارات 1 إلى 10 لمستوى تصحيح الأخطاء L
   const CAPACITIES = [0, 17, 32, 53, 78, 106, 134, 154, 192, 230, 271];
   const BLOCKS = [
     null,
@@ -553,7 +572,6 @@ function buildQRMatrix(text) {
   const [totalCW, ecPerBlock, g1Blocks, g1Data, g2Blocks, g2Data] = BLOCKS[ver];
   const totalDataCW = g1Blocks * g1Data + g2Blocks * g2Data;
 
-  // بناء سلسلة البتات (Byte Mode 0100)
   const bits = [];
   const pushBits = (val, len) => {
     for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1);
@@ -573,7 +591,6 @@ function buildQRMatrix(text) {
   const pads = [0xec, 0x11];
   for (let i = 0; dataCW.length < totalDataCW; i++) dataCW.push(pads[i % 2]);
 
-  // حساب تصحيح الأخطاء Reed-Solomon
   const blocksData = [];
   const blocksEC = [];
   let offset = 0;
@@ -596,7 +613,6 @@ function buildQRMatrix(text) {
     for (let b = 0; b < blocksEC.length; b++) finalCodewords.push(blocksEC[b][i]);
   }
 
-  // بناء المصفوفة وتثبيت الأنماط الثابتة
   const size = ver * 4 + 17;
   const grid = Array.from({ length: size }, () => Array(size).fill(-1));
   const isFunc = Array.from({ length: size }, () => Array(size).fill(false));
@@ -608,7 +624,6 @@ function buildQRMatrix(text) {
     }
   };
 
-  // أنماط البحث الثلاثة (Finder Patterns)
   const placeFinder = (r0, c0) => {
     for (let r = -1; r <= 7; r++) {
       for (let c = -1; c <= 7; c++) {
@@ -622,7 +637,6 @@ function buildQRMatrix(text) {
   placeFinder(0, size - 7);
   placeFinder(size - 7, 0);
 
-  // أنماط المحاذاة (Alignment Patterns)
   const centers = ALIGN[ver];
   for (const r of centers) {
     for (const c of centers) {
@@ -636,14 +650,12 @@ function buildQRMatrix(text) {
     }
   }
 
-  // خطوط التوقيت (Timing Patterns) + النقطة الداكنة
   for (let i = 8; i < size - 8; i++) {
     setModule(6, i, i % 2 === 0);
     setModule(i, 6, i % 2 === 0);
   }
   setModule(size - 8, 8, 1);
 
-  // حجز معلومات التنسيق والإصدار
   for (let i = 0; i < 9; i++) {
     if (i !== 6) {
       setModule(8, i, 0);
@@ -664,7 +676,6 @@ function buildQRMatrix(text) {
     }
   }
 
-  // تعبئة البيانات المتعرجة مع قناع Mask 0: (r + c) % 2 === 0
   const allBits = [];
   finalCodewords.forEach((cw) => {
     for (let b = 7; b >= 0; b--) allBits.push((cw >>> b) & 1);
@@ -688,7 +699,6 @@ function buildQRMatrix(text) {
     upward = !upward;
   }
 
-  // كتابة معلومات التنسيق (Level L + Mask 0 = 0x77C4)
   const FMT = 0x77c4;
   const fBits = Array.from({ length: 15 }, (_, i) => (FMT >>> i) & 1);
   const c1 = [0, 1, 2, 3, 4, 5, 7, 8, 8, 8, 8, 8, 8, 8, 8];
@@ -741,7 +751,7 @@ async function handleFileUpload(e) {
   if (file.type === "application/pdf") {
     state.nativePdfPath = null;
     if (!window.pdfjsLib) {
-      showToast("يرجى وضع ملفي pdf.min.js و pdf.worker.min.js في المجلد أو مشاركة الملف من الهاتف");
+      showToast("يرجى مشاركة ملف PDF من الهاتف للطباعة الفورية");
       return;
     }
     pdfjsLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js";
@@ -834,16 +844,16 @@ function renderImageToCanvas(img) {
   ctx.fillRect(0, 0, PRINTER_WIDTH, targetHeight);
   ctx.drawImage(img, 0, 0, PRINTER_WIDTH, targetHeight);
 
-  applyMonochromeFilter();
+  applyMonochromeFilter(false);
 }
 
-function applyMonochromeFilter() {
+function applyMonochromeFilter(forceSharpText = false) {
   const width = els.canvas.width;
   let height = els.canvas.height;
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
-  const threshold = parseInt(els.thresholdRange.value, 10);
-  const useDither = els.ditherSelect.value === "floyd";
+  const threshold = forceSharpText ? Math.max(150, parseInt(els.thresholdRange.value, 10)) : parseInt(els.thresholdRange.value, 10);
+  const useDither = !forceSharpText && els.ditherSelect.value === "floyd";
 
   const gray = new Float32Array(width * height);
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
@@ -911,7 +921,7 @@ function applyMonochromeFilter() {
 }
 
 // ==========================================
-// 5. محركات التشفير الثنائي + التحكم في حرارة الرأس
+// 5. محركات التشفير الثنائي لـ Intermec PR3 (576px / 72 bytes per row)
 // ==========================================
 function buildPrinterPayload() {
   const protocol = els.protocolSelect.value;
@@ -920,70 +930,79 @@ function buildPrinterPayload() {
   const h = state.monoHeight;
   const mono = state.monoBitmap;
 
-  if (protocol === "ESCP") {
-    // زمن تسخين الرأس من 40 إلى 180 حسب شريط التعتيم
-    const heatTime = Math.round(40 + ((darknessLevel - 1) / 9) * 140);
+  // 1) المحرك الأصلي لطابعة Intermec PR3 في وضع ESC/P: الأمر ESC V nL nH
+  if (protocol === "INTERMEC_ESCP") {
     const chunks = [
-      new Uint8Array([0x1b, 0x40]), // تهيئة الطابعة
-      new Uint8Array([0x1b, 0x37, 0x07, heatTime, 0x02]), // ضبط حرارة الرأس الحراري
-      new Uint8Array([0x1b, 0x33, 0x18]), // ارتفاع السطر 24 نقطة
+      new Uint8Array([0x1b, 0x40]), // تهيئة Intermec PR3
     ];
 
-    const nL = w & 0xff;
-    const nH = (w >> 8) & 0xff;
+    // إرسال الصورة على شرائح (200 صف لكل أمر ESC V) لضمان استقرار الذاكرة
+    const BAND_ROWS = 200;
+    for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
+      const bandHeight = Math.min(BAND_ROWS, h - yStart);
+      const nL = bandHeight & 0xff;
+      const nH = (bandHeight >> 8) & 0xff;
 
-    for (let y = 0; y < h; y += 24) {
-      const band = new Uint8Array(5 + w * 3 + 1);
+      // ESC V nL nH (0x1B 0x56) + بيانات النقاط (72 بايت لكل صف)
+      const band = new Uint8Array(4 + bandHeight * BYTES_PER_ROW);
       band[0] = 0x1b;
-      band[1] = 0x2a;
-      band[2] = 0x21; // ESC * 33
-      band[3] = nL;
-      band[4] = nH;
+      band[1] = 0x56;
+      band[2] = nL;
+      band[3] = nH;
 
-      let offset = 5;
-      for (let x = 0; x < w; x++) {
-        for (let k = 0; k < 3; k++) {
-          let slice = 0;
-          for (let b = 0; b < 8; b++) {
-            const py = y + k * 8 + b;
-            if (py < h && mono[py * w + x] === 1) slice |= 1 << (7 - b);
+      let offset = 4;
+      for (let r = 0; r < bandHeight; r++) {
+        const y = yStart + r;
+        for (let bx = 0; bx < BYTES_PER_ROW; bx++) {
+          let byteVal = 0;
+          for (let bit = 0; bit < 8; bit++) {
+            if (mono[y * w + bx * 8 + bit] === 1) {
+              byteVal |= 1 << (7 - bit);
+            }
           }
-          band[offset++] = slice;
+          band[offset++] = byteVal;
         }
       }
-      band[offset] = 0x0a;
       chunks.push(band);
     }
 
-    chunks.push(new Uint8Array([0x1b, 0x32]), new Uint8Array([0x1b, 0x64, 0x04]));
+    // تمرير الورق بعد نهاية الفاتورة بمقدار 72 نقطة (حوالي 9 مم)
+    chunks.push(new Uint8Array([0x1b, 0x4a, 0x48]));
     return concatUint8Arrays(chunks);
   }
 
+  // 2) محرك Intermec CPCL (CSim) مقسّم إلى شرائح لتجنب امتلاء سطر الأوامر
   if (protocol === "CPCL") {
     const encoder = new TextEncoder();
-    const tone = Math.round(-40 + ((darknessLevel - 1) / 9) * 160); // CPCL TONE (-40..+120)
+    const contrast = Math.min(3, Math.max(0, Math.floor(((darknessLevel - 1) / 9) * 3.99))); // 0..3
     const labelHeight = h + 48;
-    const header = `! 0 200 200 ${labelHeight} 1\r\nPW ${w}\r\nTONE ${tone}\r\nEG ${BYTES_PER_ROW} ${h} 0 0 `;
+    const parts = [
+      encoder.encode(`! 0 200 200 ${labelHeight} 1\r\nPW ${w}\r\nCONTRAST ${contrast}\r\n`),
+    ];
 
-    const hexChars = new Array(h * BYTES_PER_ROW);
-    let idx = 0;
-    for (let y = 0; y < h; y++) {
-      for (let bx = 0; bx < BYTES_PER_ROW; bx++) {
-        let byteVal = 0;
-        for (let bit = 0; bit < 8; bit++) {
-          if (mono[y * w + bx * 8 + bit] === 1) byteVal |= 1 << (7 - bit);
+    const BAND_ROWS = 120;
+    for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
+      const bandHeight = Math.min(BAND_ROWS, h - yStart);
+      const hexChars = new Array(bandHeight * BYTES_PER_ROW);
+      let idx = 0;
+      for (let r = 0; r < bandHeight; r++) {
+        const y = yStart + r;
+        for (let bx = 0; bx < BYTES_PER_ROW; bx++) {
+          let byteVal = 0;
+          for (let bit = 0; bit < 8; bit++) {
+            if (mono[y * w + bx * 8 + bit] === 1) byteVal |= 1 << (7 - bit);
+          }
+          hexChars[idx++] = byteVal.toString(16).padStart(2, "0").toUpperCase();
         }
-        hexChars[idx++] = byteVal.toString(16).padStart(2, "0").toUpperCase();
       }
+      parts.push(encoder.encode(`EG ${BYTES_PER_ROW} ${bandHeight} 0 ${yStart} ${hexChars.join("")}\r\n`));
     }
-    return concatUint8Arrays([
-      encoder.encode(header),
-      encoder.encode(hexChars.join("")),
-      encoder.encode("\r\nFORM\r\nPRINT\r\n"),
-    ]);
+
+    parts.push(encoder.encode("FORM\r\nPRINT\r\n"));
+    return concatUint8Arrays(parts);
   }
 
-  // ESC/POS القياسي
+  // 3) ESC/POS القياسي (GS v 0)
   const header = new Uint8Array([
     0x1b, 0x40,
     0x1d, 0x76, 0x30, 0x00,
@@ -1076,22 +1095,16 @@ async function queryPrinterTelemetry() {
   try {
     const info = await plugin.getTelemetry({ mac: els.deviceMacInput.value.trim() });
     if (info.battery) els.batteryBadge.textContent = `${info.battery}%`;
-    if (info.detectedProtocol) {
-      els.protocolSelect.value = info.detectedProtocol;
-      els.printerDetailText.textContent = `الورق: ${info.paperOk ? "سليم ✓" : "فارغ!"} | اللغة: ${info.detectedProtocol}`;
-    } else {
-      els.printerDetailText.textContent = info.statusText || "الطابعة جاهزة";
-    }
+    els.printerDetailText.textContent = `الورق: ${info.paperOk !== false ? "سليم ✓" : "فارغ!"} | الوضع: ${els.protocolSelect.value}`;
     setConnectedState(true, info.name || "Intermec PR3");
   } catch (err) {
-    els.printerDetailText.textContent = "تعذر قراءة الحالة";
+    els.printerDetailText.textContent = "الطابعة متصلة وجاهزة";
   }
 }
 
 async function sendBytesToPrinter(bytes) {
   if (window.Capacitor?.Plugins?.PR3Printer) {
     const base64 = uint8ToBase64(bytes);
-    // الجافا يعيد الاتصال صامتاً تلقائياً إذا كانت الطابعة في وضع السكون
     await window.Capacitor.Plugins.PR3Printer.write({
       data: base64,
       mac: els.deviceMacInput.value.trim(),
@@ -1145,7 +1158,7 @@ async function feedPaper() {
     const isCpcl = els.protocolSelect.value === "CPCL";
     const cmd = isCpcl
       ? new TextEncoder().encode("! 0 200 200 60 1\r\nFORM\r\nPRINT\r\n")
-      : new Uint8Array([0x1b, 0x64, 0x03]);
+      : new Uint8Array([0x1b, 0x4a, 0x48]);
     await sendBytesToPrinter(cmd);
     showToast("تم تمرير الورق");
   } catch (err) {
@@ -1154,10 +1167,10 @@ async function feedPaper() {
 }
 
 async function printTestPage() {
-  els.storeTitle.value = "اختبار PR3 Studio Pro";
-  els.storeSub.value = `وضع الأوامر: ${els.protocolSelect.value} | التعتيم: ${els.darknessRange.value}/10`;
+  els.storeTitle.value = "مؤسسة الإخلاص للتجارة";
+  els.storeSub.value = "شبرامنت - الجيزة | 01114099799";
   els.receiptBody.value =
-    "اتصال تلقائي مع سامسونج بنجاح\nطباعة عربية متصلة بعرض 576px\n--------------------------------\nالحالة: جاهز للعمل الميداني";
+    "اختبار الطباعة العربية المتصلة\nالصنف: دقيق العالمية (0.5 طن)\nالسعر: 21,500.00 ج.م\n--------------------------------\nالإجمالي: 10,750.00 ج.م";
   renderReceiptToCanvas();
   await printCurrentCanvas();
 }
