@@ -1,0 +1,97 @@
+name: Build PR3 Studio Pro APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: سحب ملفات المشروع
+        uses: actions/checkout@v4
+
+      - name: إعداد Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: إعداد Java 17 (مطلوب لـ Capacitor 6)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: تثبيت حزم Capacitor وتجهيز مجلد الويب
+        run: |
+          npm install
+          npm run prepare-web
+
+      - name: إضافة منصة Android ودمج أكواد الجافا
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          mkdir -p android/app/src/main/java/io/github/karamegy/pr3
+          cp -f native-src/*.java android/app/src/main/java/io/github/karamegy/pr3/ 2>/dev/null || cp -f *.java android/app/src/main/java/io/github/karamegy/pr3/
+          npx cap sync android
+
+      - name: حقن صلاحيات سامسونج وخدمة الطباعة في AndroidManifest.xml
+        run: |
+          python3 - << 'EOF'
+          manifest_path = "android/app/src/main/AndroidManifest.xml"
+          with open(manifest_path, "r", encoding="utf-8") as f:
+              manifest = f.read()
+
+          perms = """
+              <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+          """
+
+          share_filter = """
+                      <intent-filter>
+                          <action android:name="android.intent.action.SEND" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <data android:mimeType="image/*" />
+                          <data android:mimeType="application/pdf" />
+                          <data android:mimeType="text/plain" />
+                      </intent-filter>
+          """
+
+          print_service = """
+                  <service
+                      android:name=".PR3PrintService"
+                      android:exported="true"
+                      android:permission="android.permission.BIND_PRINT_SERVICE">
+                      <intent-filter>
+                          <action android:name="android.printservice.PrintService" />
+                      </intent-filter>
+                  </service>
+          """
+
+          if "BLUETOOTH_CONNECT" not in manifest:
+              manifest = manifest.replace("</manifest>", perms + "\n</manifest>")
+          if "ACTION_SEND" not in manifest:
+              manifest = manifest.replace("</activity>", share_filter + "\n        </activity>", 1)
+          if "PR3PrintService" not in manifest:
+              manifest = manifest.replace("</application>", print_service + "\n    </application>")
+
+          with open(manifest_path, "w", encoding="utf-8") as f:
+              f.write(manifest)
+          EOF
+
+      - name: بناء ملف APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: رفع ملف APK الجاهز للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: PR3-Studio-Pro-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
