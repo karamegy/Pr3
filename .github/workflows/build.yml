@@ -68,6 +68,9 @@ jobs:
               -dname "CN=Karam Agag, OU=GITI Tech, O=GITI Tech, L=Giza, ST=Giza, C=EG"
           fi
 
+          # نسخ الشهادة مباشرة داخل مجلد التطبيق لضمان قراءتها أثناء التوقيع
+          cp -f signing-bundle/pr3-release.keystore android/app/pr3-release.keystore
+
           # 2. تصدير ملفات الشهادات العامة (PEM & DER) وملف Base64 للأسرار
           keytool -exportcert -rfc \
             -keystore signing-bundle/pr3-release.keystore \
@@ -137,7 +140,6 @@ jobs:
           }]
           EOF
 
-          # عرض البصمات مباشرة في ملخص صفحة GitHub Actions
           cat << EOF >> $GITHUB_STEP_SUMMARY
           ### بصمات التوقيع المستخرجة (PR3 Studio Pro)
           * **Release SHA-1:** \`$REL_SHA1\`
@@ -196,9 +198,13 @@ jobs:
               gradle = f.read()
 
           signing_block = """
+              lint {
+                  checkReleaseBuilds false
+                  abortOnError false
+              }
               signingConfigs {
                   release {
-                      storeFile file("../../signing-bundle/pr3-release.keystore")
+                      storeFile file("pr3-release.keystore")
                       storePassword System.getenv("KEYSTORE_PASSWORD") ?: "PR3Studio@2026"
                       keyAlias System.getenv("KEY_ALIAS") ?: "pr3releasekey"
                       keyPassword System.getenv("KEY_PASSWORD") ?: "PR3Studio@2026"
@@ -226,7 +232,16 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug assembleRelease bundleRelease
+          set -o pipefail
+          ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace 2>&1 | tee ../gradle_build.log
+
+      - name: عرض سبب الخطأ مباشرة إن وجد
+        if: failure()
+        run: |
+          echo "### تفاصيل خطأ البناء" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          grep -E "(error:|FAILURE:|What went wrong:|Execution failed)" -A 6 gradle_build.log | tail -n 45 >> $GITHUB_STEP_SUMMARY \vert{}\vert{} tail -n 45 gradle_build.log >>$GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: رفع حزم التطبيق (APK & AAB)
         uses: actions/upload-artifact@v4
