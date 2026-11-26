@@ -1,10 +1,10 @@
 /**
- * Intermec PR3 Thermal Print Engine Pro (576px / 80mm / 203 DPI)
- * محرك طباعة عربية خالصة لطابعة Intermec PR3:
- * يدعم Intermec ESC/P (ESC V)، و CPCL (CSim)، و ESC/POS، والاتصال التلقائي ومشاركة سامسونج.
+ * Intermec PR3 Thermal Print Engine Pro v4 (576px / 80mm / 203 DPI)
+ * محرك طباعة حرارية متكامل لطابعة Intermec PR3:
+ * يدعم الأعمدة المزدوجة (||)، الشعار، الترقيم، سجل الفواتير، تدوير الصور، ESC/P (ESC V) و CPCL.
  */
 
-const PRINTER_WIDTH = 576; // عرض رأس طباعة PR3 بالبكسل
+const PRINTER_WIDTH = 576;
 const BYTES_PER_ROW = PRINTER_WIDTH / 8; // 72 بايت لكل صف
 
 const DEFAULT_TEMPLATES = [
@@ -12,14 +12,14 @@ const DEFAULT_TEMPLATES = [
     name: "فاتورة مبيعات نقدية",
     title: "مؤسسة الإخلاص",
     sub: "شبرامنت - الجيزة",
-    body: "الصنف: علف تسمين سوبر 50 كجم\nالكمية: 2 × 950 ج.م\n--------------------------------\nالإجمالي: 1,900.00 ج.م\nشكراً لتعاملكم معنا",
+    body: "علف تسمين سوبر 50 كجم (2 × 950) || 1,900.00 ج.م\n--------------------------------\nالإجمالي المستحق || 1,900.00 ج.م\nشكراً لتعاملكم معنا",
     qr: "مؤسسة الإخلاص - شبرامنت",
   },
   {
     name: "إذن تسليم وبوليصة شحن",
     title: "إذن تسليم بضاعة",
     sub: "إدارة النقل والتوزيع",
-    body: "العميل: ..............................\nالعنوان: ..............................\nعدد الطرود: ....... | الوزن: ....... كجم\nتوقيع المستلم: ......................",
+    body: "العميل: ..............................\nالعنوان: ..............................\nعدد الطرود: ....... || الوزن: ....... كجم\nتوقيع المستلم: ......................",
     qr: "DELIVERY-SLIP",
   },
 ];
@@ -27,10 +27,12 @@ const DEFAULT_TEMPLATES = [
 const state = {
   connected: false,
   connecting: false,
+  printing: false,
   deviceName: null,
   bleCharacteristic: null,
   activeTab: "receiptTab",
   loadedImage: null,
+  logoImage: null,
   pdfDoc: null,
   nativePdfPath: null,
   nativePdfTotalPages: 0,
@@ -40,6 +42,7 @@ const state = {
   monoHeight: 0,
   seqCounter: 1001,
   templates: [],
+  history: [],
 };
 
 const els = {
@@ -53,7 +56,11 @@ const els = {
   btnFeed: document.getElementById("btnFeed"),
   btnTestPrint: document.getElementById("btnTestPrint"),
   btnPrintNow: document.getElementById("btnPrintNow"),
+  printBtnLabel: document.getElementById("printBtnLabel"),
+  printProgressBar: document.getElementById("printProgressBar"),
+  copiesQuickSelect: document.getElementById("copiesQuickSelect"),
   btnRefreshPreview: document.getElementById("btnRefreshPreview"),
+  btnSavePng: document.getElementById("btnSavePng"),
   btnSaveSettings: document.getElementById("btnSaveSettings"),
   btnDownloadRaw: document.getElementById("btnDownloadRaw"),
   protocolSelect: document.getElementById("protocolSelect"),
@@ -63,25 +70,37 @@ const els = {
   darknessRange: document.getElementById("darknessRange"),
   darknessVal: document.getElementById("darknessVal"),
   autoCropCheck: document.getElementById("autoCropCheck"),
+  borderFrameCheck: document.getElementById("borderFrameCheck"),
   templateSelect: document.getElementById("templateSelect"),
   btnSaveTemplate: document.getElementById("btnSaveTemplate"),
   btnDeleteTemplate: document.getElementById("btnDeleteTemplate"),
+  logoInput: document.getElementById("logoInput"),
+  btnClearLogo: document.getElementById("btnClearLogo"),
+  logoStatusText: document.getElementById("logoStatusText"),
+  receiptLangSelect: document.getElementById("receiptLangSelect"),
   storeTitle: document.getElementById("storeTitle"),
   storeSub: document.getElementById("storeSub"),
   autoNumberCheck: document.getElementById("autoNumberCheck"),
   nextSeqDisplay: document.getElementById("nextSeqDisplay"),
   autoDateCheck: document.getElementById("autoDateCheck"),
+  quickItemName: document.getElementById("quickItemName"),
+  quickItemQty: document.getElementById("quickItemQty"),
+  quickItemPrice: document.getElementById("quickItemPrice"),
+  btnAddQuickItem: document.getElementById("btnAddQuickItem"),
   receiptBody: document.getElementById("receiptBody"),
   fontSizeRange: document.getElementById("fontSizeRange"),
   fontSizeVal: document.getElementById("fontSizeVal"),
   barcodeInput: document.getElementById("barcodeInput"),
   qrInput: document.getElementById("qrInput"),
   fileInput: document.getElementById("fileInput"),
+  btnRotateImg: document.getElementById("btnRotateImg"),
   pdfControls: document.getElementById("pdfControls"),
   prevPage: document.getElementById("prevPage"),
   nextPage: document.getElementById("nextPage"),
   pageIndicator: document.getElementById("pageIndicator"),
   btnPrintAllPdf: document.getElementById("btnPrintAllPdf"),
+  historyList: document.getElementById("historyList"),
+  btnClearHistory: document.getElementById("btnClearHistory"),
   deviceMacInput: document.getElementById("deviceMacInput"),
   seqCounterInput: document.getElementById("seqCounterInput"),
   autoConnectBootCheck: document.getElementById("autoConnectBootCheck"),
@@ -94,40 +113,28 @@ const els = {
 const ctx = els.canvas.getContext("2d", { willReadFrequently: true });
 
 // ==========================================
-// 1. التهيئة والاتصال التلقائي واستقبال مشاركة سامسونج
+// 1. التهيئة واستعادة الإعدادات والشعار والسجل
 // ==========================================
 window.addEventListener("DOMContentLoaded", async () => {
-  initProtocolOptions();
   loadSavedSettings();
+  loadSavedLogo();
   loadTemplates();
+  loadHistory();
   detectTransportBridge();
   bindEvents();
   setupNativeShareListener();
   handleUrlParameters();
   renderCurrentView();
 
-  // الاتصال الصامت التلقائي بالطابعة عند تشغيل التطبيق
   if (els.autoConnectBootCheck.checked) {
     setTimeout(() => connectPrinter(true), 400);
   }
 });
 
-function initProtocolOptions() {
-  if (!els.protocolSelect) return;
-  els.protocolSelect.innerHTML = `
-    <option value="INTERMEC_ESCP">Intermec PR3 ESC/P (ESC V) - الموصى به</option>
-    <option value="CPCL">Intermec CPCL (CSim)</option>
-    <option value="ESCPOS">ESC/POS (GS v 0)</option>
-  `;
-  els.protocolSelect.value = "INTERMEC_ESCP";
-}
-
 function loadSavedSettings() {
-  const saved = JSON.parse(localStorage.getItem("pr3_settings_v3") || localStorage.getItem("pr3_settings_v2") || "{}");
+  const saved = JSON.parse(localStorage.getItem("pr3_settings_v4") || localStorage.getItem("pr3_settings_v3") || "{}");
   if (saved.protocol && ["INTERMEC_ESCP", "CPCL", "ESCPOS"].includes(saved.protocol)) {
     els.protocolSelect.value = saved.protocol;
-  } else {
-    els.protocolSelect.value = "INTERMEC_ESCP";
   }
   if (saved.dither) els.ditherSelect.value = saved.dither;
   if (saved.threshold) {
@@ -138,6 +145,9 @@ function loadSavedSettings() {
     els.darknessRange.value = saved.darkness;
     els.darknessVal.textContent = saved.darkness;
   }
+  if (typeof saved.borderFrame === "boolean") els.borderFrameCheck.checked = saved.borderFrame;
+  if (saved.receiptLang) els.receiptLangSelect.value = saved.receiptLang;
+
   els.deviceMacInput.value = (saved.mac || "88:6B:0F:AF:F8:4F").trim();
   if (saved.storeTitle) els.storeTitle.value = saved.storeTitle;
   if (saved.storeSub) els.storeSub.value = saved.storeSub;
@@ -150,7 +160,7 @@ function loadSavedSettings() {
   els.barcodeInput.value = `INV-${state.seqCounter}`;
 }
 
-function saveSettings() {
+function saveSettings(silent = false) {
   state.seqCounter = Math.max(1, parseInt(els.seqCounterInput.value || "1001", 10));
   els.nextSeqDisplay.textContent = state.seqCounter;
 
@@ -159,6 +169,8 @@ function saveSettings() {
     dither: els.ditherSelect.value,
     threshold: els.thresholdRange.value,
     darkness: els.darknessRange.value,
+    borderFrame: els.borderFrameCheck.checked,
+    receiptLang: els.receiptLangSelect.value,
     mac: els.deviceMacInput.value.trim(),
     storeTitle: els.storeTitle.value,
     storeSub: els.storeSub.value,
@@ -166,8 +178,52 @@ function saveSettings() {
     autoConnectBoot: els.autoConnectBootCheck.checked,
     autoPrintShare: els.autoPrintShareCheck.checked,
   };
-  localStorage.setItem("pr3_settings_v3", JSON.stringify(data));
-  showToast("تم حفظ الإعدادات وتحديث الترقيم");
+  localStorage.setItem("pr3_settings_v4", JSON.stringify(data));
+  if (!silent) showToast("تم حفظ الإعدادات وتحديث الترقيم");
+}
+
+function loadSavedLogo() {
+  const dataUrl = localStorage.getItem("pr3_store_logo_v1");
+  if (!dataUrl) return;
+  const img = new Image();
+  img.onload = () => {
+    state.logoImage = img;
+    els.btnClearLogo.classList.remove("hidden");
+    els.logoStatusText.textContent = "تم تحميل الشعار ✓";
+    renderCurrentView();
+  };
+  img.src = dataUrl;
+}
+
+function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const maxW = 280;
+    const scale = Math.min(1, maxW / img.width);
+    const off = document.createElement("canvas");
+    off.width = Math.round(img.width * scale);
+    off.height = Math.round(img.height * scale);
+    const oCtx = off.getContext("2d");
+    oCtx.fillStyle = "#ffffff";
+    oCtx.fillRect(0, 0, off.width, off.height);
+    oCtx.drawImage(img, 0, 0, off.width, off.height);
+    const compressedUrl = off.toDataURL("image/png");
+    localStorage.setItem("pr3_store_logo_v1", compressedUrl);
+    loadSavedLogo();
+    showToast("تم حفظ شعار المتجر");
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function clearSavedLogo() {
+  localStorage.removeItem("pr3_store_logo_v1");
+  state.logoImage = null;
+  els.btnClearLogo.classList.add("hidden");
+  els.logoStatusText.textContent = "بدون شعار";
+  renderCurrentView();
+  showToast("تمت إزالة الشعار");
 }
 
 function detectTransportBridge() {
@@ -176,11 +232,10 @@ function detectTransportBridge() {
   } else if (navigator.bluetooth) {
     els.bridgeModeText.textContent = "Web Bluetooth API";
   } else {
-    els.bridgeModeText.textContent = "وضع المتصفح (جاهز للتغليف بـ Capacitor)";
+    els.bridgeModeText.textContent = "وضع المتصفح";
   }
 }
 
-// استقبال الملفات والصور والنصوص المرسلة عبر زر "مشاركة" في سامسونج
 function setupNativeShareListener() {
   const plugin = window.Capacitor?.Plugins?.PR3Printer;
   if (!plugin || !plugin.addListener) return;
@@ -231,7 +286,7 @@ function handleUrlParameters() {
 }
 
 // ==========================================
-// 2. إدارة القوالب المحفوظة والأحداث
+// 2. القوالب، الإضافة السريعة، وسجل الفواتير
 // ==========================================
 function loadTemplates() {
   const stored = localStorage.getItem("pr3_templates_v1");
@@ -274,6 +329,91 @@ function deleteSelectedTemplate() {
   showToast("تم حذف القالب");
 }
 
+function addQuickItemToReceipt() {
+  const name = els.quickItemName.value.trim();
+  const qty = parseFloat(els.quickItemQty.value || "1");
+  const price = parseFloat(els.quickItemPrice.value || "0");
+  if (!name) {
+    showToast("اكتب اسم الصنف أولاً");
+    return;
+  }
+  const total = (qty * price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const qtyLabel = qty !== 1 ? ` (${qty} × ${price})` : "";
+  const newLine = price > 0 ? `${name}${qtyLabel} || ${total}` : `${name}${qtyLabel}`;
+
+  const current = els.receiptBody.value.trim();
+  els.receiptBody.value = current ? `${newLine}\n${current}` : newLine;
+  els.quickItemName.value = "";
+  els.quickItemQty.value = "1";
+  els.quickItemPrice.value = "";
+  renderReceiptToCanvas();
+}
+
+function loadHistory() {
+  state.history = JSON.parse(localStorage.getItem("pr3_history_v1") || "[]");
+  renderHistoryList();
+}
+
+function pushToHistory() {
+  if (state.activeTab !== "receiptTab") return;
+  const entry = {
+    id: Date.now(),
+    seq: state.seqCounter,
+    time: new Date().toLocaleString("ar-EG", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }),
+    title: els.storeTitle.value,
+    sub: els.storeSub.value,
+    body: els.receiptBody.value,
+    barcode: els.barcodeInput.value,
+    qr: els.qrInput.value,
+  };
+  state.history.unshift(entry);
+  state.history = state.history.slice(0, 15);
+  localStorage.setItem("pr3_history_v1", JSON.stringify(state.history));
+  renderHistoryList();
+}
+
+function renderHistoryList() {
+  if (!state.history.length) {
+    els.historyList.innerHTML = '<div class="empty-state">لا توجد فواتير مطبوعة في السجل بعد</div>';
+    return;
+  }
+  els.historyList.innerHTML = "";
+  state.history.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "history-item";
+    const firstLine = (item.body.split("\n")[0] || "").replace("||", "-");
+    row.innerHTML = `
+      <div class="history-info">
+        <div class="history-title">#${item.seq} • ${escapeHtml(firstLine)}</div>
+        <div class="history-meta">${escapeHtml(item.time)} • ${escapeHtml(item.title)}</div>
+      </div>
+      <button type="button" class="btn btn-outline btn-xs">استرجاع</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => {
+      els.storeTitle.value = item.title || "";
+      els.storeSub.value = item.sub || "";
+      els.receiptBody.value = item.body || "";
+      els.barcodeInput.value = item.barcode || "";
+      els.qrInput.value = item.qr || "";
+      switchTab("receiptTab");
+      renderReceiptToCanvas();
+      showToast(`تم استرجاع الفاتورة #${item.seq}`);
+    });
+    els.historyList.appendChild(row);
+  });
+}
+
+function clearHistory() {
+  state.history = [];
+  localStorage.removeItem("pr3_history_v1");
+  renderHistoryList();
+  showToast("تم مسح السجل");
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+}
+
 function switchTab(tabId) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tabId));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === tabId));
@@ -303,13 +443,17 @@ function bindEvents() {
 
   els.btnSaveTemplate.addEventListener("click", saveCurrentAsTemplate);
   els.btnDeleteTemplate.addEventListener("click", deleteSelectedTemplate);
+  els.logoInput.addEventListener("change", handleLogoUpload);
+  els.btnClearLogo.addEventListener("click", clearSavedLogo);
+  els.btnAddQuickItem.addEventListener("click", addQuickItemToReceipt);
+  els.btnClearHistory.addEventListener("click", clearHistory);
 
   [els.storeTitle, els.storeSub, els.receiptBody, els.barcodeInput, els.qrInput].forEach((input) => {
     input.addEventListener("input", renderReceiptToCanvas);
   });
 
-  [els.autoNumberCheck, els.autoDateCheck].forEach((chk) => {
-    chk.addEventListener("change", renderReceiptToCanvas);
+  [els.autoNumberCheck, els.autoDateCheck, els.receiptLangSelect].forEach((el) => {
+    el.addEventListener("change", renderReceiptToCanvas);
   });
 
   els.fontSizeRange.addEventListener("input", () => {
@@ -324,16 +468,19 @@ function bindEvents() {
 
   els.darknessRange.addEventListener("input", () => {
     els.darknessVal.textContent = els.darknessRange.value;
+    renderCurrentView();
   });
 
-  [els.ditherSelect, els.autoCropCheck].forEach((el) => {
+  [els.ditherSelect, els.autoCropCheck, els.borderFrameCheck].forEach((el) => {
     el.addEventListener("change", renderCurrentView);
   });
 
-  els.protocolSelect.addEventListener("change", saveSettings);
+  els.protocolSelect.addEventListener("change", () => saveSettings(true));
 
   els.btnRefreshPreview.addEventListener("click", renderCurrentView);
+  els.btnSavePng.addEventListener("click", downloadPreviewPng);
   els.fileInput.addEventListener("change", handleFileUpload);
+  els.btnRotateImg.addEventListener("click", rotateLoadedImage90);
   els.prevPage.addEventListener("click", () => changePdfPage(-1));
   els.nextPage.addEventListener("click", () => changePdfPage(1));
   els.btnPrintAllPdf.addEventListener("click", printAllPdfPages);
@@ -343,7 +490,7 @@ function bindEvents() {
   els.btnFeed.addEventListener("click", feedPaper);
   els.btnTestPrint.addEventListener("click", printTestPage);
   els.btnPrintNow.addEventListener("click", printCurrentCanvas);
-  els.btnSaveSettings.addEventListener("click", saveSettings);
+  els.btnSaveSettings.addEventListener("click", () => saveSettings(false));
   els.btnDownloadRaw.addEventListener("click", downloadRawBinary);
 }
 
@@ -356,7 +503,7 @@ function renderCurrentView() {
 }
 
 // ==========================================
-// 3. محرك رسم الإيصالات العربية الحادة + الباركود + QR أوفلاين (576px)
+// 3. محرك رسم الإيصالات العربية والإنجليزية + الأعمدة المزدوجة (576px)
 // ==========================================
 const ARABIC_FONT_STACK = '"Noto Sans Arabic", "Droid Arabic Naskh", "Cairo", Tahoma, Arial, sans-serif';
 
@@ -367,51 +514,82 @@ function renderReceiptToCanvas() {
   const barcodeText = els.barcodeInput.value.trim();
   const qrText = els.qrInput.value.trim();
   const fontSize = parseInt(els.fontSizeRange.value, 10);
-  const lineHeight = Math.round(fontSize * 1.48);
+  const lineHeight = Math.round(fontSize * 1.5);
   const showMeta = els.autoNumberCheck.checked || els.autoDateCheck.checked;
+  const padX = els.borderFrameCheck.checked ? 22 : 14;
 
-  // تجهيز سطر الترقيم والتاريخ اللحظي
+  const langMode = els.receiptLangSelect.value;
+  const hasArabicContent = /[\u0600-\u06FF]/.test(`${title} ${sub} ${bodyLines.join(" ")}`);
+  const isArabicReceipt = langMode === "ar" || (langMode === "auto" && hasArabicContent);
+
   let metaLine = "";
   if (showMeta) {
     const parts = [];
-    if (els.autoNumberCheck.checked) parts.push(`فاتورة #${state.seqCounter}`);
+    if (els.autoNumberCheck.checked) {
+      parts.push(isArabicReceipt ? `فاتورة #${state.seqCounter}` : `Invoice #${state.seqCounter}`);
+    }
     if (els.autoDateCheck.checked) {
       const now = new Date();
-      const dateStr = now.toLocaleDateString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit" });
-      const timeStr = now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+      const locale = isArabicReceipt ? "ar-EG" : "en-GB";
+      const dateStr = now.toLocaleDateString(locale, { year: "numeric", month: "2-digit", day: "2-digit" });
+      const timeStr = now.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
       parts.push(`${dateStr} ${timeStr}`);
     }
     metaLine = parts.join("  |  ");
   }
 
-  // التفاف الأسطر التلقائي لعرض 576px
-  const wrappedLines = [];
+  // معالجة الأسطر: دعم الأعمدة المزدوجة (||) والتفاف الأسطر الطويلة
+  const processedItems = [];
   ctx.font = `700 ${fontSize}px ${ARABIC_FONT_STACK}`;
+  const maxLineWidth = PRINTER_WIDTH - padX * 2;
+
   bodyLines.forEach((rawLine) => {
     if (!rawLine.trim()) {
-      wrappedLines.push("");
+      processedItems.push({ type: "text", text: "" });
       return;
     }
+    if (/^[-=_]{3,}$/.test(rawLine.trim())) {
+      processedItems.push({ type: "divider" });
+      return;
+    }
+    if (rawLine.includes("||")) {
+      const [colA, ...rest] = rawLine.split("||");
+      processedItems.push({
+        type: "columns",
+        primary: colA.trim(),
+        secondary: rest.join("||").trim(),
+      });
+      return;
+    }
+
     const words = rawLine.split(" ");
     let current = "";
     words.forEach((word) => {
       const test = current ? `${current} ${word}` : word;
-      if (ctx.measureText(test).width > PRINTER_WIDTH - 28) {
-        if (current) wrappedLines.push(current);
+      if (ctx.measureText(test).width > maxLineWidth) {
+        if (current) processedItems.push({ type: "text", text: current });
         current = word;
       } else {
         current = test;
       }
     });
-    if (current) wrappedLines.push(current);
+    if (current) processedItems.push({ type: "text", text: current });
   });
 
+  let logoDrawH = 0;
+  let logoDrawW = 0;
+  if (state.logoImage) {
+    logoDrawW = Math.min(220, state.logoImage.width);
+    logoDrawH = Math.round((state.logoImage.height * logoDrawW) / state.logoImage.width);
+  }
+
   let estimatedHeight = 48;
+  if (logoDrawH > 0) estimatedHeight += logoDrawH + 16;
   if (title) estimatedHeight += 48;
   if (sub) estimatedHeight += 34;
   if (title || sub) estimatedHeight += 20;
   if (metaLine) estimatedHeight += 36;
-  estimatedHeight += wrappedLines.length * lineHeight + 24;
+  estimatedHeight += processedItems.length * lineHeight + 24;
   if (barcodeText) estimatedHeight += 105;
   if (qrText) estimatedHeight += 210;
 
@@ -423,12 +601,18 @@ function renderReceiptToCanvas() {
   ctx.fillStyle = "#000000";
   ctx.textBaseline = "top";
 
-  let y = 18;
+  let y = 20;
+  const headerDir = isArabicReceipt ? "rtl" : "ltr";
+
+  if (state.logoImage && logoDrawH > 0) {
+    ctx.drawImage(state.logoImage, Math.round((PRINTER_WIDTH - logoDrawW) / 2), y, logoDrawW, logoDrawH);
+    y += logoDrawH + 14;
+  }
 
   if (title) {
     ctx.font = `800 36px ${ARABIC_FONT_STACK}`;
     ctx.textAlign = "center";
-    ctx.direction = "rtl";
+    ctx.direction = headerDir;
     ctx.fillText(title, PRINTER_WIDTH / 2, y);
     y += 46;
   }
@@ -436,34 +620,42 @@ function renderReceiptToCanvas() {
   if (sub) {
     ctx.font = `700 24px ${ARABIC_FONT_STACK}`;
     ctx.textAlign = "center";
-    ctx.direction = "rtl";
+    ctx.direction = headerDir;
     ctx.fillText(sub, PRINTER_WIDTH / 2, y);
     y += 34;
   }
 
   if (title || sub) {
-    ctx.fillRect(14, y + 3, PRINTER_WIDTH - 28, 3);
+    ctx.fillRect(padX, y + 3, PRINTER_WIDTH - padX * 2, 3);
     y += 18;
   }
 
   if (metaLine) {
     ctx.font = `700 21px ${ARABIC_FONT_STACK}`;
     ctx.textAlign = "center";
-    ctx.direction = "rtl";
+    ctx.direction = headerDir;
     ctx.fillText(metaLine, PRINTER_WIDTH / 2, y);
     y += 34;
   }
 
   ctx.font = `700 ${fontSize}px ${ARABIC_FONT_STACK}`;
-  wrappedLines.forEach((line) => {
-    if (/^[-=_]{3,}$/.test(line.trim())) {
-      ctx.fillRect(14, y + Math.floor(lineHeight / 2), PRINTER_WIDTH - 28, 2);
+  processedItems.forEach((item) => {
+    if (item.type === "divider") {
+      ctx.fillRect(padX, y + Math.floor(lineHeight / 2), PRINTER_WIDTH - padX * 2, 2);
+    } else if (item.type === "columns") {
+      ctx.direction = isArabicReceipt ? "rtl" : "ltr";
+      ctx.textAlign = isArabicReceipt ? "right" : "left";
+      ctx.fillText(item.primary, isArabicReceipt ? PRINTER_WIDTH - padX : padX, y);
+
+      ctx.textAlign = isArabicReceipt ? "left" : "right";
+      ctx.fillText(item.secondary, isArabicReceipt ? padX : PRINTER_WIDTH - padX, y);
     } else {
-      const isArabic = /[\u0600-\u06FF]/.test(line);
-      ctx.direction = isArabic ? "rtl" : "ltr";
-      ctx.textAlign = isArabic ? "right" : "left";
-      const x = isArabic ? PRINTER_WIDTH - 14 : 14;
-      ctx.fillText(line, x, y);
+      const lineIsArabic =
+        langMode === "ar" ? true : langMode === "en" ? false : /[\u0600-\u06FF]/.test(item.text);
+      ctx.direction = lineIsArabic ? "rtl" : "ltr";
+      ctx.textAlign = lineIsArabic ? "right" : "left";
+      const x = lineIsArabic ? PRINTER_WIDTH - padX : padX;
+      ctx.fillText(item.text, x, y);
     }
     y += lineHeight;
   });
@@ -480,11 +672,12 @@ function renderReceiptToCanvas() {
     y += 186;
   }
 
-  // للنصوص العربية نستخدم العتبة الحادة دائماً لمنع تشوش الحروف
   applyMonochromeFilter(true);
 }
 
-// مولد باركود Code 128B أوفلاين
+// ==========================================
+// الباركود Code 128B و QR Code أوفلاين
+// ==========================================
 function drawCode128(context, text, centerX, startY, barHeight) {
   const PATTERNS = [
     "212222","222122","222221","121223","121322","131222","122213","122312","132212","221213",
@@ -524,9 +717,6 @@ function drawCode128(context, text, centerX, startY, barHeight) {
   context.fillText(text, centerX, startY + barHeight + 3);
 }
 
-// ==========================================
-// مولد QR Code مدمج 100% أوفلاين (ISO/IEC 18004 - UTF-8 Byte Mode)
-// ==========================================
 function drawOfflineQRCode(context, text, centerX, startY, targetSize) {
   const matrix = buildQRMatrix(text);
   if (!matrix) return;
@@ -743,7 +933,7 @@ function rsComputeEC(data, ecCount) {
 }
 
 // ==========================================
-// 4. معالجة الصور وملفات PDF (أوفلاين بالكامل)
+// 4. معالجة الصور، التدوير، وملفات PDF
 // ==========================================
 async function handleFileUpload(e) {
   const file = e.target.files[0];
@@ -770,6 +960,28 @@ async function handleFileUpload(e) {
     };
     img.src = URL.createObjectURL(file);
   }
+}
+
+function rotateLoadedImage90() {
+  if (!state.loadedImage) {
+    showToast("اختر صورة أو ملف PDF أولاً");
+    return;
+  }
+  const img = state.loadedImage;
+  const off = document.createElement("canvas");
+  off.width = img.height;
+  off.height = img.width;
+  const oCtx = off.getContext("2d");
+  oCtx.translate(off.width / 2, off.height / 2);
+  oCtx.rotate(Math.PI / 2);
+  oCtx.drawImage(img, -img.width / 2, -img.height / 2);
+
+  const rotated = new Image();
+  rotated.onload = () => {
+    state.loadedImage = rotated;
+    renderImageToCanvas(rotated);
+  };
+  rotated.src = off.toDataURL("image/png");
 }
 
 async function renderNativePdfPage(pageNum) {
@@ -853,7 +1065,14 @@ function applyMonochromeFilter(forceSharpText = false) {
   let height = els.canvas.height;
   const imgData = ctx.getImageData(0, 0, width, height);
   const data = imgData.data;
-  const threshold = forceSharpText ? Math.max(150, parseInt(els.thresholdRange.value, 10)) : parseInt(els.thresholdRange.value, 10);
+
+  // ربط شريط التعتيم (1..10) بحساسية العتبة النقطية لزيادة وضوح الطباعة
+  const darkness = parseInt(els.darknessRange.value, 10);
+  const darknessBias = (darkness - 5) * 6;
+  const baseThreshold = forceSharpText
+    ? Math.max(150, parseInt(els.thresholdRange.value, 10))
+    : parseInt(els.thresholdRange.value, 10);
+  const threshold = Math.min(235, Math.max(40, baseThreshold + darknessBias));
   const useDither = !forceSharpText && els.ditherSelect.value === "floyd";
 
   const gray = new Float32Array(width * height);
@@ -904,6 +1123,22 @@ function applyMonochromeFilter(forceSharpText = false) {
     trimmedHeight = Math.min(height, lastBlackRow + 24);
   }
 
+  // رسم الإطار الخارجي حول الإيصال عند التفعيل
+  if (els.borderFrameCheck.checked && trimmedHeight > 16) {
+    for (let x = 6; x < width - 6; x++) {
+      mono[6 * width + x] = 1;
+      mono[7 * width + x] = 1;
+      mono[(trimmedHeight - 7) * width + x] = 1;
+      mono[(trimmedHeight - 8) * width + x] = 1;
+    }
+    for (let y = 6; y < trimmedHeight - 6; y++) {
+      mono[y * width + 6] = 1;
+      mono[y * width + 7] = 1;
+      mono[y * width + (width - 7)] = 1;
+      mono[y * width + (width - 8)] = 1;
+    }
+  }
+
   els.canvas.height = trimmedHeight;
   const outImg = ctx.createImageData(width, trimmedHeight);
   for (let i = 0; i < width * trimmedHeight; i++) {
@@ -921,35 +1156,34 @@ function applyMonochromeFilter(forceSharpText = false) {
   els.canvasHeightLabel.textContent = trimmedHeight;
 }
 
+function downloadPreviewPng() {
+  const link = document.createElement("a");
+  link.download = `PR3_Receipt_${state.seqCounter}.png`;
+  link.href = els.canvas.toDataURL("image/png");
+  link.click();
+  showToast("تم حفظ صورة المعاينة");
+}
+
 // ==========================================
 // 5. محركات التشفير الثنائي لـ Intermec PR3 (576px / 72 bytes per row)
 // ==========================================
 function buildPrinterPayload() {
   const protocol = els.protocolSelect.value;
-  const darknessLevel = parseInt(els.darknessRange.value, 10); // 1..10
+  const darknessLevel = parseInt(els.darknessRange.value, 10);
   const w = PRINTER_WIDTH;
   const h = state.monoHeight;
   const mono = state.monoBitmap;
 
-  // 1) المحرك الأصلي لطابعة Intermec PR3 في وضع ESC/P: الأمر ESC V nL nH
   if (protocol === "INTERMEC_ESCP") {
-    const chunks = [
-      new Uint8Array([0x1b, 0x40]), // تهيئة Intermec PR3
-    ];
-
-    // إرسال الصورة على شرائح (200 صف لكل أمر ESC V) لضمان استقرار الذاكرة
+    const chunks = [new Uint8Array([0x1b, 0x40])];
     const BAND_ROWS = 200;
     for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
       const bandHeight = Math.min(BAND_ROWS, h - yStart);
-      const nL = bandHeight & 0xff;
-      const nH = (bandHeight >> 8) & 0xff;
-
-      // ESC V nL nH (0x1B 0x56) + بيانات النقاط (72 بايت لكل صف)
       const band = new Uint8Array(4 + bandHeight * BYTES_PER_ROW);
       band[0] = 0x1b;
       band[1] = 0x56;
-      band[2] = nL;
-      band[3] = nH;
+      band[2] = bandHeight & 0xff;
+      band[3] = (bandHeight >> 8) & 0xff;
 
       let offset = 4;
       for (let r = 0; r < bandHeight; r++) {
@@ -966,20 +1200,15 @@ function buildPrinterPayload() {
       }
       chunks.push(band);
     }
-
-    // تمرير الورق بعد نهاية الفاتورة بمقدار 72 نقطة (حوالي 9 مم)
     chunks.push(new Uint8Array([0x1b, 0x4a, 0x48]));
     return concatUint8Arrays(chunks);
   }
 
-  // 2) محرك Intermec CPCL (CSim) مقسّم إلى شرائح لتجنب امتلاء سطر الأوامر
   if (protocol === "CPCL") {
     const encoder = new TextEncoder();
-    const contrast = Math.min(3, Math.max(0, Math.floor(((darknessLevel - 1) / 9) * 3.99))); // 0..3
+    const contrast = Math.min(3, Math.max(0, Math.floor(((darknessLevel - 1) / 9) * 3.99)));
     const labelHeight = h + 48;
-    const parts = [
-      encoder.encode(`! 0 200 200 ${labelHeight} 1\r\nPW ${w}\r\nCONTRAST ${contrast}\r\n`),
-    ];
+    const parts = [encoder.encode(`! 0 200 200 ${labelHeight} 1\r\nPW ${w}\r\nCONTRAST ${contrast}\r\n`)];
 
     const BAND_ROWS = 120;
     for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
@@ -1003,7 +1232,6 @@ function buildPrinterPayload() {
     return concatUint8Arrays(parts);
   }
 
-  // 3) ESC/POS القياسي (GS v 0)
   const header = new Uint8Array([
     0x1b, 0x40,
     0x1d, 0x76, 0x30, 0x00,
@@ -1035,7 +1263,7 @@ function concatUint8Arrays(arrays) {
 }
 
 // ==========================================
-// 6. الاتصال التلقائي وفحص الحالة ثنائي الاتجاه
+// 6. الاتصال التلقائي والطباعة المتعددة مع شريط التقدم
 // ==========================================
 async function connectPrinter(silent = false) {
   if (state.connecting) return;
@@ -1046,7 +1274,7 @@ async function connectPrinter(silent = false) {
       const res = await window.Capacitor.Plugins.PR3Printer.connect({ mac });
       if (res.mac && els.deviceMacInput.value !== res.mac) {
         els.deviceMacInput.value = res.mac;
-        saveSettings();
+        saveSettings(true);
       }
       setConnectedState(true, res.name || "Intermec PR3");
       if (!silent) showToast("تم الاتصال بطابعة PR3 بنجاح");
@@ -1107,18 +1335,18 @@ async function queryPrinterTelemetry() {
   }
 }
 
-async function sendBytesToPrinter(bytes) {
+async function sendBytesToPrinter(bytes, onProgress) {
   if (window.Capacitor?.Plugins?.PR3Printer) {
-    const CHUNK_SIZE = 2048; // إرسال 2 كيلوبايت في كل دفعة لمنع امتلاء ذاكرة الطابعة
+    const CHUNK_SIZE = 2048;
     const mac = els.deviceMacInput.value.trim();
 
     for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
       const slice = bytes.slice(i, i + CHUNK_SIZE);
       const base64 = uint8ToBase64(slice);
-      await window.Capacitor.Plugins.PR3Printer.write({
-        data: base64,
-        mac: mac,
-      });
+      await window.Capacitor.Plugins.PR3Printer.write({ data: base64, mac });
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round(((i + slice.length) / bytes.length) * 100)));
+      }
       if (i + CHUNK_SIZE < bytes.length) {
         await new Promise((r) => setTimeout(r, 25));
       }
@@ -1137,6 +1365,9 @@ async function sendBytesToPrinter(bytes) {
       } else {
         await state.bleCharacteristic.writeValue(slice);
       }
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round(((i + slice.length) / bytes.length) * 100)));
+      }
     }
     return;
   }
@@ -1145,14 +1376,30 @@ async function sendBytesToPrinter(bytes) {
 }
 
 async function printCurrentCanvas() {
+  if (state.printing) return;
   if (!state.monoBitmap || state.monoHeight === 0) renderCurrentView();
-  try {
-    showToast("جاري الإرسال إلى PR3...");
-    const payload = buildPrinterPayload();
-    await sendBytesToPrinter(payload);
-    showToast("تمت الطباعة بنجاح ✓");
 
-    // زيادة الترقيم التسلسلي تلقائياً بعد نجاح طباعة الإيصال
+  const copies = Math.max(1, parseInt(els.copiesQuickSelect.value || "1", 10));
+  state.printing = true;
+  els.printProgressBar.style.width = "5%";
+
+  try {
+    const payload = buildPrinterPayload();
+    for (let c = 1; c <= copies; c++) {
+      els.printBtnLabel.textContent =
+        copies > 1 ? `جاري طباعة النسخة ${c} من ${copies}...` : "جاري الإرسال إلى PR3...";
+      await sendBytesToPrinter(payload, (pct) => {
+        const overall = Math.round(((c - 1 + pct / 100) / copies) * 100);
+        els.printProgressBar.style.width = `${overall}%`;
+      });
+      if (c < copies) {
+        await new Promise((r) => setTimeout(r, 450));
+      }
+    }
+
+    pushToHistory();
+    showToast(copies > 1 ? `تمت طباعة ${copies} نسخ بنجاح ✓` : "تمت الطباعة بنجاح ✓");
+
     if (state.activeTab === "receiptTab" && els.autoNumberCheck.checked) {
       state.seqCounter += 1;
       els.seqCounterInput.value = state.seqCounter;
@@ -1160,11 +1407,17 @@ async function printCurrentCanvas() {
       if (/^INV-\d+$/.test(els.barcodeInput.value.trim())) {
         els.barcodeInput.value = `INV-${state.seqCounter}`;
       }
-      saveSettings();
+      saveSettings(true);
       renderReceiptToCanvas();
     }
   } catch (err) {
     showToast(err.message);
+  } finally {
+    state.printing = false;
+    els.printBtnLabel.textContent = "طباعة الآن على PR3";
+    setTimeout(() => {
+      els.printProgressBar.style.width = "0%";
+    }, 500);
   }
 }
 
@@ -1185,7 +1438,7 @@ async function printTestPage() {
   els.storeTitle.value = "مؤسسة الإخلاص للتجارة";
   els.storeSub.value = "شبرامنت - الجيزة | 01114099799";
   els.receiptBody.value =
-    "اختبار الطباعة العربية المتصلة\nالصنف: دقيق العالمية (0.5 طن)\nالسعر: 21,500.00 ج.م\n--------------------------------\nالإجمالي: 10,750.00 ج.م";
+    "اختبار الطباعة العربية المتصلة\nدقيق العالمية (0.5 طن) || 10,750.00 ج.م\n--------------------------------\nالإجمالي || 10,750.00 ج.م";
   renderReceiptToCanvas();
   await printCurrentCanvas();
 }
