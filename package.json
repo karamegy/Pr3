@@ -1,0 +1,17 @@
+{
+  "name": "pr3-studio-pro",
+  "version": "1.0.0",
+  "description": "Intermec PR3 Thermal Printer Studio for Samsung Android",
+  "main": "app.js",
+  "scripts": {
+    "prepare-web": "mkdir -p www && cp index.html style.css app.js www/ && ([ -f pdf.min.js ] && cp pdf*.js www/ || true)",
+    "sync": "npm run prepare-web && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}
