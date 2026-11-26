@@ -26,6 +26,7 @@ const DEFAULT_TEMPLATES = [
 
 const state = {
   connected: false,
+  connecting: false,
   deviceName: null,
   bleCharacteristic: null,
   activeTab: "receiptTab",
@@ -122,7 +123,7 @@ function initProtocolOptions() {
 }
 
 function loadSavedSettings() {
-  const saved = JSON.parse(localStorage.getItem("pr3_settings_v3") || "{}");
+  const saved = JSON.parse(localStorage.getItem("pr3_settings_v3") || localStorage.getItem("pr3_settings_v2") || "{}");
   if (saved.protocol && ["INTERMEC_ESCP", "CPCL", "ESCPOS"].includes(saved.protocol)) {
     els.protocolSelect.value = saved.protocol;
   } else {
@@ -137,7 +138,7 @@ function loadSavedSettings() {
     els.darknessRange.value = saved.darkness;
     els.darknessVal.textContent = saved.darkness;
   }
-  if (saved.mac) els.deviceMacInput.value = saved.mac;
+  els.deviceMacInput.value = (saved.mac || "88:6B:0F:AF:F8:4F").trim();
   if (saved.storeTitle) els.storeTitle.value = saved.storeTitle;
   if (saved.storeSub) els.storeSub.value = saved.storeSub;
   if (typeof saved.autoConnectBoot === "boolean") els.autoConnectBootCheck.checked = saved.autoConnectBoot;
@@ -1037,17 +1038,19 @@ function concatUint8Arrays(arrays) {
 // 6. الاتصال التلقائي وفحص الحالة ثنائي الاتجاه
 // ==========================================
 async function connectPrinter(silent = false) {
+  if (state.connecting) return;
+  state.connecting = true;
   try {
     if (window.Capacitor?.Plugins?.PR3Printer) {
       const mac = els.deviceMacInput.value.trim();
       const res = await window.Capacitor.Plugins.PR3Printer.connect({ mac });
-      if (res.mac && !els.deviceMacInput.value) {
+      if (res.mac && els.deviceMacInput.value !== res.mac) {
         els.deviceMacInput.value = res.mac;
         saveSettings();
       }
       setConnectedState(true, res.name || "Intermec PR3");
       if (!silent) showToast("تم الاتصال بطابعة PR3 بنجاح");
-      queryPrinterTelemetry();
+      setTimeout(() => queryPrinterTelemetry(), 500);
       return;
     }
 
@@ -1079,6 +1082,8 @@ async function connectPrinter(silent = false) {
   } catch (err) {
     setConnectedState(false, null);
     if (!silent) showToast(`تعذر الاتصال: ${err.message}`);
+  } finally {
+    state.connecting = false;
   }
 }
 
@@ -1104,11 +1109,21 @@ async function queryPrinterTelemetry() {
 
 async function sendBytesToPrinter(bytes) {
   if (window.Capacitor?.Plugins?.PR3Printer) {
-    const base64 = uint8ToBase64(bytes);
-    await window.Capacitor.Plugins.PR3Printer.write({
-      data: base64,
-      mac: els.deviceMacInput.value.trim(),
-    });
+    const CHUNK_SIZE = 2048; // إرسال 2 كيلوبايت في كل دفعة لمنع امتلاء ذاكرة الطابعة
+    const mac = els.deviceMacInput.value.trim();
+
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const slice = bytes.slice(i, i + CHUNK_SIZE);
+      const base64 = uint8ToBase64(slice);
+      await window.Capacitor.Plugins.PR3Printer.write({
+        data: base64,
+        mac: mac,
+      });
+      if (i + CHUNK_SIZE < bytes.length) {
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
+
     setConnectedState(true, state.deviceName || "Intermec PR3");
     return;
   }
