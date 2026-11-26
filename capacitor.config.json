@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.karamegy.pr3",
+  "appName": "PR3 Studio Pro",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#000000"
+  }
+}
