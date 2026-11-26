@@ -74,6 +74,92 @@ jobs:
           rm -rf _backup_java
           npx cap sync android
 
+      - name: تركيب لوجو التطبيق الخاص بنا (Icon512.jpg) بجميع المقاسات
+        run: |
+          python3 -c "import PIL" 2>/dev/null || pip install --quiet pillow
+          python3 - << 'PYEOF'
+          import os, glob
+          from PIL import Image, ImageDraw
+
+          icon_path = None
+          for candidate in ["Icon512.jpg", "icon512.jpg", "Icon512.png", "icon512.png"]:
+              if os.path.exists(candidate):
+                  icon_path = candidate
+                  break
+
+          if not icon_path:
+              raise FileNotFoundError("لم يتم العثور على ملف اللوجو Icon512.jpg في المجلد الرئيسي للمشروع!")
+
+          res_dir = "android/app/src/main/res"
+
+          for pattern in [
+              f"{res_dir}/mipmap-*/ic_launcher*",
+              f"{res_dir}/drawable*/ic_launcher*",
+              f"{res_dir}/values/ic_launcher_background.xml",
+          ]:
+              for f in glob.glob(pattern):
+                  if os.path.isfile(f):
+                      os.remove(f)
+
+          img = Image.open(icon_path).convert("RGBA")
+          w, h = img.size
+          side = min(w, h)
+          left = (w - side) // 2
+          top = (h - side) // 2
+          img = img.crop((left, top, left + side, top + side))
+
+          bg_pixel = img.getpixel((0, 0))
+          bg_hex = "#{:02X}{:02X}{:02X}".format(bg_pixel[0], bg_pixel[1], bg_pixel[2])
+
+          densities = {
+              "mdpi": (48, 108),
+              "hdpi": (72, 162),
+              "xhdpi": (96, 216),
+              "xxhdpi": (144, 324),
+              "xxxhdpi": (192, 432),
+          }
+
+          for density, (legacy_size, fg_size) in densities.items():
+              mipmap_dir = os.path.join(res_dir, f"mipmap-{density}")
+              os.makedirs(mipmap_dir, exist_ok=True)
+
+              standard = img.resize((legacy_size, legacy_size), Image.Resampling.LANCZOS)
+              standard.save(os.path.join(mipmap_dir, "ic_launcher.png"), "PNG")
+
+              mask = Image.new("L", (legacy_size, legacy_size), 0)
+              draw = ImageDraw.Draw(mask)
+              draw.ellipse((0, 0, legacy_size, legacy_size), fill=255)
+              round_icon = Image.new("RGBA", (legacy_size, legacy_size), (0, 0, 0, 0))
+              round_icon.paste(standard, (0, 0), mask)
+              round_icon.save(os.path.join(mipmap_dir, "ic_launcher_round.png"), "PNG")
+
+              fg_canvas = Image.new("RGBA", (fg_size, fg_size), (0, 0, 0, 0))
+              inner_size = int(fg_size * 0.74)
+              inner_icon = img.resize((inner_size, inner_size), Image.Resampling.LANCZOS)
+              offset = (fg_size - inner_size) // 2
+              fg_canvas.paste(inner_icon, (offset, offset), inner_icon)
+              fg_canvas.save(os.path.join(mipmap_dir, "ic_launcher_foreground.png"), "PNG")
+
+          values_dir = os.path.join(res_dir, "values")
+          os.makedirs(values_dir, exist_ok=True)
+          with open(os.path.join(values_dir, "ic_launcher_background.xml"), "w", encoding="utf-8") as f:
+              f.write(f'<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">{bg_hex}</color>\n</resources>\n')
+
+          anydpi_dir = os.path.join(res_dir, "mipmap-anydpi-v26")
+          os.makedirs(anydpi_dir, exist_ok=True)
+          adaptive_xml = '''<?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background"/>
+              <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+          </adaptive-icon>
+          '''
+          for name in ["ic_launcher.xml", "ic_launcher_round.xml"]:
+              with open(os.path.join(anydpi_dir, name), "w", encoding="utf-8") as f:
+                  f.write(adaptive_xml)
+
+          print(f"✅ تم تركيب اللوجو ({icon_path}) بنجاح بجميع المقاسات")
+          PYEOF
+
       - name: التحقق الإلزامي من شهادة التوقيع ومطابقة البصمات المعتمدة فقط
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
