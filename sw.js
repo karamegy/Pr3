@@ -1,10 +1,14 @@
-const CACHE_NAME = "pr3-studio-pro-v1";
+const CACHE_NAME = "pr3-studio-pro-v2";
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
-  "./manifest.json"
+  "./manifest.json",
+  "./privacy-policy.html",
+  "./permissions.html",
+  "./terms.html",
+  "./Icon512.jpg"
 ];
 
 self.addEventListener("install", (event) => {
@@ -27,11 +31,15 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (!event.request.url.startsWith("http")) return;
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))
