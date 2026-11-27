@@ -43,7 +43,7 @@ public class MainActivity extends BridgeActivity {
             try {
                 JSObject payload = new JSObject();
 
-                if ("text/plain".equals(type)) {
+                if (type.startsWith("text/")) {
                     String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
                     if (sharedText == null || sharedText.trim().isEmpty()) return;
                     payload.put("type", "text");
@@ -102,6 +102,12 @@ public class MainActivity extends BridgeActivity {
                 } else {
                     return;
                 }
+
+                // انتظار جاهزية الجسر والواجهة قبل تمرير الملف المشارك
+                for (int attempt = 0; attempt < 15 && getBridge() == null; attempt++) {
+                    Thread.sleep(200);
+                }
+                Thread.sleep(500);
 
                 runOnUiThread(() -> {
                     if (getBridge() != null) {
