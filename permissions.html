@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>إفصاح الأذونات والصلاحيات - Permissions Disclosure | Pr3 stydeo pro</title>
+  <meta name="description" content="بيان الإفصاح عن أذونات وصلاحيات تطبيق Pr3 stydeo pro للطباعة الحرارية باللغة العربية - متوافق مع سياسات Google Play." />
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Permissions Disclosure - Pr3 stydeo pro",
+    "inLanguage": ["ar", "en"],
+    "dateModified": "2026-11-27",
+    "relatedLink": "privacy-policy.html",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Karam.apk",
+      "email": "haretg@gmail.com",
+      "telephone": "+201114099799"
+    },
+    "about": {
+      "@type": "SoftwareApplication",
+      "name": "Pr3 stydeo pro",
+      "operatingSystem": "Android",
+      "applicationCategory": "UtilitiesApplication",
+      "permissions": [
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.INTERNET",
+        "android.permission.BIND_PRINT_SERVICE"
+      ]
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --border: #334155;
+      --badge-bg: rgba(56, 189, 248, 0.12);
+    }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      margin: 0;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+    }
+    h1, h2 { color: var(--accent); margin-top: 0; }
+    h2 { font-size: 1.2rem; margin-top: 26px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    p, li { color: var(--text); font-size: 0.98rem; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+    .disclosure-box {
+      background: var(--badge-bg);
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin: 18px 0;
+    }
+    .table-wrap { overflow-x: auto; margin-top: 14px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: start;
+      vertical-align: top;
+    }
+    th { background: #0f172a; color: var(--accent); }
+    code {
+      background: #0f172a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+      font-size: 0.86rem;
+      display: inline-block;
+    }
+    .ltr-inline { direction: ltr; unicode-bidi: embed; display: inline-block; }
+    .en-section {
+      direction: ltr;
+      text-align: left;
+      margin-top: 42px;
+      padding-top: 26px;
+      border-top: 2px dashed var(--border);
+    }
+    .footer-nav {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.9rem;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>إفصاح الأذونات والصلاحيات (Permissions Disclosure)</h1>
+    <p class="meta">آخر تحديث: 27 نوفمبر 2026 | المطور: <strong>Karam.apk</strong> | التطبيق: <strong>Pr3 stydeo pro</strong></p>
+
+    <div class="disclosure-box">
+      <strong>إفصاح بارز (Prominent Disclosure):</strong>
+      يستخدم تطبيق <strong>Pr3 stydeo pro</strong> أذونات البلوتوث والأجهزة القريبة (Nearby Devices) <strong>حصرياً</strong> للاتصال بطابعات الإيصالات الحرارية المقترنة بهاتفك وإرسال أوامر الطباعة إليها. تم تعطيل استخدام البلوتوث لتحديد الموقع الجغرافي بالكامل، ولا يقوم التطبيق بجمع أو إرسال أي بيانات موقع أو ملفات شخصية خارج جهازك.
+    </div>
+
+    <h2>1. جدول الأذونات المطلوبة في التطبيق</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>الإذن التقني (Permission)</th>
+            <th>النطاق</th>
+            <th>سبب الاستخدام الفعلي</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>BLUETOOTH_CONNECT</code></td>
+            <td>أندرويد 12 فأحدث</td>
+            <td>الاتصال المباشر بالطابعات الحرارية المقترنة مسبقاً في إعدادات بلوتوث الهاتف وإرسال بيانات الفواتير للطباعة.</td>
+          </tr>
+          <tr>
+            <td><code>BLUETOOTH_SCAN</code><br /><small>(<code>neverForLocation</code>)</small></td>
+            <td>أندرويد 12 فأحدث</td>
+            <td>البحث عن طابعات البلوتوث القريبة الجاهزة للطباعة فقط، مع تفعيل علم <code>neverForLocation</code> لمنع استنتاج الموقع الجغرافي.</td>
+          </tr>
+          <tr>
+            <td><code>BLUETOOTH</code> &amp; <code>BLUETOOTH_ADMIN</code></td>
+            <td>أندرويد 11 فأقدم<br /><small>(<code>maxSdkVersion="30"</code>)</small></td>
+            <td>توفير التوافق مع إصدارات أندرويد القديمة للاتصال بطابعات البلوتوث الحرارية فقط.</td>
+          </tr>
+          <tr>
+            <td><code>BIND_PRINT_SERVICE</code></td>
+            <td>خدمة طباعة النظام</td>
+            <td>تسجيل التطبيق كخدمة طباعة رسمية في نظام أندرويد (<code>PR3PrintService</code>) لتمكين الطباعة من أي تطبيق آخر.</td>
+          </tr>
+          <tr>
+            <td><code>INTERNET</code></td>
+            <td>اتصال الشبكة</td>
+            <td>فتح الروابط الموثوقة (<code>karamegy.github.io</code>) وصفحات المساعدة وسياسة الخصوصية عند طلب المستخدم فقط.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>2. الوصول المؤقت للملفات (عبر مشاركة النظام)</h2>
+    <p>لا يطلب التطبيق إذن الوصول الشامل إلى ذاكرة الهاتف (<code>READ_EXTERNAL_STORAGE</code> أو <code>MANAGE_EXTERNAL_STORAGE</code>). عند قيامك بمشاركة صورة أو ملف <code>PDF</code> أو نص مع التطبيق، يقرأ التطبيق الملف مؤقتاً عبر آلية النظام الآمنة (<code>FileProvider</code>) لتحويله إلى أوامر طباعة، ثم يتم مسحه من الذاكرة المؤقتة فوراً.</p>
+
+    <h2>3. أذونات لا يطلبها التطبيق نهائياً</h2>
+    <ul>
+      <li><strong>الموقع الجغرافي (GPS / Location):</strong> غير مطلوب تماماً.</li>
+      <li><strong>الكاميرا والميكروفون وجهات الاتصال:</strong> غير مطلوبة تماماً.</li>
+      <li><strong>التتبع في الخلفية:</strong> لا يعمل التطبيق في الخلفية لجمع أي بيانات أو مراقبة نشاط المستخدم.</li>
+    </ul>
+
+    <h2>4. التواصل مع المطور</h2>
+    <p>للاستفسارات المتعلقة بالصلاحيات أو الامتثال لسياسات المتجر، يرجى التواصل عبر:</p>
+    <ul>
+      <li><strong>البريد الإلكتروني الأساسي:</strong> <a href="mailto:haretg@gmail.com" class="ltr-inline">haretg@gmail.com</a></li>
+      <li><strong>البريد الإلكتروني البديل:</strong> <a href="mailto:Eelkady188@gmail.com" class="ltr-inline">Eelkady188@gmail.com</a></li>
+      <li><strong>رقم الهاتف / واتساب:</strong> <a href="tel:+201114099799" class="ltr-inline">+201114099799</a></li>
+    </ul>
+
+    <!-- English Version -->
+    <div class="en-section">
+      <h1>Permissions Disclosure (English)</h1>
+      <p class="meta">Last Updated: November 27, 2026 | Developer: <strong>Karam.apk</strong> | App: <strong>Pr3 stydeo pro</strong></p>
+
+      <div class="disclosure-box">
+        <strong>Prominent Disclosure:</strong>
+        <strong>Pr3 stydeo pro</strong> uses Bluetooth / Nearby Devices permissions <strong>solely</strong> to connect to paired thermal receipt printers and transmit print jobs. Bluetooth scanning is explicitly configured with <code>neverForLocation</code>, and the app never collects, stores, or transmits location data or personal documents to external servers.
+      </div>
+
+      <h2>1. Declared Android Permissions</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Android Permission</th>
+              <th>API Scope</th>
+              <th>Purpose &amp; Functionality</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>BLUETOOTH_CONNECT</code></td>
+              <td>Android 12+ (API 31+)</td>
+              <td>Connects to user-paired Bluetooth thermal printers to send formatted Arabic receipts, images, and PDF print commands.</td>
+            </tr>
+            <tr>
+              <td><code>BLUETOOTH_SCAN</code><br /><small>(<code>neverForLocation</code>)</small></td>
+              <td>Android 12+ (API 31+)</td>
+              <td>Discovers nearby Bluetooth printers for printing purposes only. Explicitly flagged with <code>neverForLocation</code> so it cannot be used to derive physical location.</td>
+            </tr>
+            <tr>
+              <td><code>BLUETOOTH</code> &amp; <code>BLUETOOTH_ADMIN</code></td>
+              <td>Android 11 &amp; below<br /><small>(<code>maxSdkVersion="30"</code>)</small></td>
+              <td>Backward compatibility for establishing Bluetooth serial connections with thermal printers on legacy Android versions.</td>
+            </tr>
+            <tr>
+              <td><code>BIND_PRINT_SERVICE</code></td>
+              <td>System Print Framework</td>
+              <td>Registers <code>PR3PrintService</code> as a native Android Print Service so users can print directly from any app's Print menu.</td>
+            </tr>
+            <tr>
+              <td><code>INTERNET</code></td>
+              <td>Network</td>
+              <td>Used exclusively for verified App Links (<code>karamegy.github.io</code>) and viewing documentation or policy pages upon user action.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>2. Scoped File Handling (No Broad Storage Access)</h2>
+      <p>The app does <strong>not</strong> request broad storage permissions (<code>READ_EXTERNAL_STORAGE</code> or <code>MANAGE_EXTERNAL_STORAGE</code>). Files (images, PDFs, plain text) shared via Android's <code>ACTION_SEND</code> or Print framework are processed temporarily in local memory using <code>FileProvider</code> and discarded immediately after printing.</p>
+
+      <h2>3. Permissions Never Requested</h2>
+      <ul>
+        <li><strong>Location (Fine / Coarse / Background GPS):</strong> Never requested.</li>
+        <li><strong>Contacts, Camera, Microphone, or Call Logs:</strong> Never requested.</li>
+      </ul>
+
+      <h2>4. Developer Contact</h2>
+      <p>For compliance or permission inquiries, contact:</p>
+      <ul>
+        <li><strong>Primary Email:</strong> <a href="mailto:haretg@gmail.com">haretg@gmail.com</a></li>
+        <li><strong>Secondary Email:</strong> <a href="mailto:Eelkady188@gmail.com">Eelkady188@gmail.com</a></li>
+        <li><strong>Phone / WhatsApp:</strong> <a href="tel:+201114099799">+201114099799</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-nav">
+      <a href="privacy-policy.html">← سياسة الخصوصية (Privacy Policy)</a>
+      <span>© 2026 Karam.apk</span>
+    </div>
+  </div>
+</body>
+</html>
