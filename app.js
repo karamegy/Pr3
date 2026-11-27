@@ -1,14 +1,16 @@
 /**
- * Intermec PR3 Thermal Print Engine Pro v5 (80mm / 576px & 58mm / 384px @ 203 DPI)
+ * Intermec PR3 Thermal Print Engine Pro v6 (80mm / 576px & 58mm / 384px @ 203 DPI)
  * محرك طباعة حرارية متكامل لطابعة Intermec PR3:
  * يدعم مقاسي الورق 80mm و 58mm، الأعمدة المزدوجة (||)، الشعار، الترقيم، سجل الفواتير،
- * تدوير الصور، Intermec ESC/P (ESC * 24-dot)، CPCL، و ESC/POS.
+ * تدوير الصور، Intermec ESC/P (ESC V Big-Endian)، CPCL، و ESC/POS.
  */
 
 const PAPER_WIDTHS = {
   "80": 576, // عرض ورق 80 مم (72 بايت لكل صف)
   "58": 384, // عرض ورق 58 مم (48 بايت لكل صف)
 };
+
+const PR3_HEAD_BYTES = 72; // العرض الفيزيائي الكامل لرأس طابعة Intermec PR3 (576 نقطة)
 
 const DEFAULT_TEMPLATES = [
   {
@@ -51,10 +53,6 @@ const state = {
 
 function getPrinterWidth() {
   return PAPER_WIDTHS[state.paperSize] || 576;
-}
-
-function getBytesPerRow() {
-  return getPrinterWidth() / 8;
 }
 
 const els = {
@@ -145,7 +143,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-// إنشاء قائمة اختيار مقاس الورق (80mm / 58mm) تلقائياً في الواجهة إن لم تكن موجودة في HTML
 function ensurePaperSizeSelector() {
   if (els.paperSizeSelect) return;
   const anchorSelect = els.protocolSelect || els.ditherSelect;
@@ -182,9 +179,9 @@ function updateCanvasDimensionLabels(height) {
 
 function loadSavedSettings() {
   const saved = JSON.parse(
-    localStorage.getItem("pr3_settings_v5") ||
+    localStorage.getItem("pr3_settings_v6") ||
+      localStorage.getItem("pr3_settings_v5") ||
       localStorage.getItem("pr3_settings_v4") ||
-      localStorage.getItem("pr3_settings_v3") ||
       "{}"
   );
 
@@ -247,7 +244,7 @@ function saveSettings(silent = false) {
     autoConnectBoot: els.autoConnectBootCheck.checked,
     autoPrintShare: els.autoPrintShareCheck.checked,
   };
-  localStorage.setItem("pr3_settings_v5", JSON.stringify(data));
+  localStorage.setItem("pr3_settings_v6", JSON.stringify(data));
   if (!silent) showToast(`تم حفظ الإعدادات (ورق ${state.paperSize} مم)`);
 }
 
@@ -625,7 +622,6 @@ function renderReceiptToCanvas() {
     metaLine = parts.join(" | ");
   }
 
-  // معالجة الأسطر: دعم الأعمدة المزدوجة (||) والتفاف الأسطر الطويلة
   const processedItems = [];
   ctx.font = `700 ${fontSize}px ${ARABIC_FONT_STACK}`;
   const maxLineWidth = printerWidth - padX * 2;
@@ -1265,53 +1261,43 @@ function buildPrinterPayload() {
   const protocol = els.protocolSelect.value;
   const darknessLevel = parseInt(els.darknessRange.value, 10);
   const w = state.monoWidth || getPrinterWidth();
-  const bytesPerRow = w / 8; // 72 بايت لورق 80mm و 48 بايت لورق 58mm
+  const srcBytesPerRow = w / 8; // 72 لورق 80mm أو 48 لورق 58mm
   const h = state.monoHeight;
   const mono = state.monoBitmap;
 
-  // 1) Intermec PR3 ESC/P القياسي (ESC * 33 = 24-dot vertical column graphics @ 203 DPI)
+  // 1) Intermec PR3 ESC/P الرسمي: ESC V n1 n2 (Big-Endian: n1 = High Byte, n2 = Low Byte)
+  // رأس طباعة PR3 يحتاج دائماً 72 بايت لكل صف، لذا يتم توسيط مقاس 58mm تلقائياً داخل 72 بايت
   if (protocol === "INTERMEC_ESCP") {
     const chunks = [];
-    // تهيئة الطابعة + ضبط خطوة التقديم إلى 24 نقطة + ضبط الهامش الأيسر على 0
-    chunks.push(new Uint8Array([0x1b, 0x40, 0x1b, 0x33, 0x18, 0x1b, 0x6c, 0x00]));
+    const BAND_ROWS = 28; // 28 × 72 + 4 = 2020 بايت (تناسب ذاكرة بلوتوث PR3)
+    const leftPadBytes = Math.max(0, Math.floor((PR3_HEAD_BYTES - srcBytesPerRow) / 2));
 
-    const n1 = w & 0xff;
-    const n2 = (w >> 8) & 0xff;
-
-    for (let yStart = 0; yStart < h; yStart += 24) {
-      // 5 بايت ترويسة + (w * 3 بايت بيانات أعمدة) + 4 بايت تقديم السطر (ESC J 24 + CR)
-      const band = new Uint8Array(5 + w * 3 + 4);
+    for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
+      const bandHeight = Math.min(BAND_ROWS, h - yStart);
+      const band = new Uint8Array(4 + bandHeight * PR3_HEAD_BYTES);
       band[0] = 0x1b; // ESC
-      band[1] = 0x2a; // * (Select Bit-Image Mode)
-      band[2] = 0x21; // m = 33 (24-dot double density 203 DPI)
-      band[3] = n1;
-      band[4] = n2;
+      band[1] = 0x56; // V (Intermec Uncompressed Bit-Image Graphics)
+      band[2] = (bandHeight >> 8) & 0xff; // n1 = High Byte (MSB)
+      band[3] = bandHeight & 0xff;        // n2 = Low Byte (LSB)
 
-      let offset = 5;
-      for (let x = 0; x < w; x++) {
-        for (let b = 0; b < 3; b++) {
+      for (let r = 0; r < bandHeight; r++) {
+        const y = yStart + r;
+        const rowOffset = 4 + r * PR3_HEAD_BYTES + leftPadBytes;
+        for (let bx = 0; bx < srcBytesPerRow; bx++) {
           let byteVal = 0;
           for (let bit = 0; bit < 8; bit++) {
-            const y = yStart + b * 8 + bit;
-            if (y < h && mono[y * w + x] === 1) {
+            if (mono[y * w + bx * 8 + bit] === 1) {
               byteVal |= 1 << (7 - bit);
             }
           }
-          band[offset++] = byteVal;
+          band[rowOffset + bx] = byteVal;
         }
       }
-
-      // ESC J 24 (تقديم 24 نقطة بالضبط) + CR (إرجاع الرأس لبداية السطر)
-      band[offset++] = 0x1b;
-      band[offset++] = 0x4a;
-      band[offset++] = 0x18;
-      band[offset++] = 0x0d;
-
       chunks.push(band);
     }
 
-    // تغذية ورق إضافية لإخراج الفاتورة بعد القص
-    chunks.push(new Uint8Array([0x1b, 0x4a, 0x60, 0x0d, 0x0a]));
+    // تغذية الورق بعد انتهاء الفاتورة
+    chunks.push(new Uint8Array([0x1b, 0x4a, 0x48, 0x0d]));
     return concatUint8Arrays(chunks);
   }
 
@@ -1325,11 +1311,11 @@ function buildPrinterPayload() {
     const BAND_ROWS = 120;
     for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
       const bandHeight = Math.min(BAND_ROWS, h - yStart);
-      const hexChars = new Array(bandHeight * bytesPerRow);
+      const hexChars = new Array(bandHeight * srcBytesPerRow);
       let idx = 0;
       for (let r = 0; r < bandHeight; r++) {
         const y = yStart + r;
-        for (let bx = 0; bx < bytesPerRow; bx++) {
+        for (let bx = 0; bx < srcBytesPerRow; bx++) {
           let byteVal = 0;
           for (let bit = 0; bit < 8; bit++) {
             if (mono[y * w + bx * 8 + bit] === 1) byteVal |= 1 << (7 - bit);
@@ -1337,28 +1323,28 @@ function buildPrinterPayload() {
           hexChars[idx++] = byteVal.toString(16).padStart(2, "0").toUpperCase();
         }
       }
-      parts.push(encoder.encode(`EG ${bytesPerRow} ${bandHeight} 0 ${yStart} ${hexChars.join("")}\r\n`));
+      parts.push(encoder.encode(`EG ${srcBytesPerRow} ${bandHeight} 0 ${yStart} ${hexChars.join("")}\r\n`));
     }
 
     parts.push(encoder.encode("FORM\r\nPRINT\r\n"));
     return concatUint8Arrays(parts);
   }
 
-  // 3) بروتوكول ESC/POS (للطابعات الحرارية الصينية القياسية 80mm / 58mm)
+  // 3) بروتوكول ESC/POS (للطابعات الحرارية القياسية 80mm / 58mm)
   const header = new Uint8Array([
     0x1b, 0x40,
     0x1d, 0x76, 0x30, 0x00,
-    bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff,
+    srcBytesPerRow & 0xff, (srcBytesPerRow >> 8) & 0xff,
     h & 0xff, (h >> 8) & 0xff,
   ]);
-  const raster = new Uint8Array(h * bytesPerRow);
+  const raster = new Uint8Array(h * srcBytesPerRow);
   for (let y = 0; y < h; y++) {
-    for (let bx = 0; bx < bytesPerRow; bx++) {
+    for (let bx = 0; bx < srcBytesPerRow; bx++) {
       let byteVal = 0;
       for (let bit = 0; bit < 8; bit++) {
         if (mono[y * w + bx * 8 + bit] === 1) byteVal |= 1 << (7 - bit);
       }
-      raster[y * bytesPerRow + bx] = byteVal;
+      raster[y * srcBytesPerRow + bx] = byteVal;
     }
   }
   return concatUint8Arrays([header, raster, new Uint8Array([0x1b, 0x64, 0x04])]);
