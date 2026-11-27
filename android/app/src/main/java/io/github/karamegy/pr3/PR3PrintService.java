@@ -117,7 +117,6 @@ public class PR3PrintService extends PrintService {
         }).start();
     }
 
-    // التشفير الأصلي لطابعة Intermec PR3 (الأمر ESC V nL nH بعرض 576px = 72 بايت لكل صف)
     private byte[] encodeBitmapToIntermecEscP(Bitmap bmp) {
         int w = bmp.getWidth();
         int h = bmp.getHeight();
@@ -140,14 +139,12 @@ public class PR3PrintService extends PrintService {
 
         int trimmedH = Math.min(h, lastBlackY + 24);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.write(0x1B);
-        out.write(0x40); // تهيئة PR3
 
-        int bandRows = 200;
+        int bandRows = 28;
         for (int yStart = 0; yStart < trimmedH; yStart += bandRows) {
             int bandHeight = Math.min(bandRows, trimmedH - yStart);
             out.write(0x1B);
-            out.write(0x56); // ESC V
+            out.write(0x56);
             out.write(bandHeight & 0xFF);
             out.write((bandHeight >> 8) & 0xFF);
 
@@ -165,7 +162,6 @@ public class PR3PrintService extends PrintService {
             }
         }
 
-        // تمرير الورق بعد نهاية الصفحة
         out.write(0x1B);
         out.write(0x4A);
         out.write(0x48);
