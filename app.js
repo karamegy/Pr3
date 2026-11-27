@@ -1175,8 +1175,8 @@ function buildPrinterPayload() {
   const mono = state.monoBitmap;
 
   if (protocol === "INTERMEC_ESCP") {
-    const chunks = [new Uint8Array([0x1b, 0x40])];
-    const BAND_ROWS = 200;
+    const chunks = [];
+    const BAND_ROWS = 28; // 28 × 72 + 4 = 2020 بايت (متوافق مع ذاكرة استقبال PR3)
     for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
       const bandHeight = Math.min(BAND_ROWS, h - yStart);
       const band = new Uint8Array(4 + bandHeight * BYTES_PER_ROW);
@@ -1348,7 +1348,7 @@ async function sendBytesToPrinter(bytes, onProgress) {
         onProgress(Math.min(100, Math.round(((i + slice.length) / bytes.length) * 100)));
       }
       if (i + CHUNK_SIZE < bytes.length) {
-        await new Promise((r) => setTimeout(r, 25));
+        await new Promise((r) => setTimeout(r, 60));
       }
     }
 
