@@ -33,7 +33,7 @@
       border-color: #38bdf8;
     }
 
-    /* نافذة الخصوصية والشروط عند الفتح الأول وعند الطلب */
+    /* نافذة الخصوصية والشروط والأذونات المدمجة */
     .legal-modal-backdrop {
       position: fixed;
       inset: 0;
@@ -50,8 +50,8 @@
     }
     .legal-modal-card {
       width: 100%;
-      max-width: 540px;
-      max-height: 90vh;
+      max-width: 560px;
+      max-height: 88vh;
       background: #0f172a;
       border: 1px solid #334155;
       border-radius: 16px;
@@ -68,6 +68,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      flex-shrink: 0;
     }
     .legal-modal-header h2 {
       margin: 0;
@@ -81,6 +82,7 @@
       background: #0b1120;
       border-bottom: 1px solid #1e293b;
       overflow-x: auto;
+      flex-shrink: 0;
     }
     .legal-pill {
       font-size: 11px;
@@ -98,29 +100,89 @@
       color: #ffffff;
       font-weight: 600;
     }
-    .legal-summary-box {
-      padding: 12px 14px;
-      font-size: 12px;
-      color: #e2e8f0;
-      line-height: 1.6;
+    .legal-body-scroll {
+      flex: 1;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 14px;
+      font-size: 12.5px;
+      color: #e2e8f0;
+      line-height: 1.65;
     }
-    .legal-summary-box ul {
-      margin: 6px 0 0;
-      padding-right: 18px;
-    }
-    .legal-summary-box li {
-      margin-bottom: 6px;
-    }
-    .legal-iframe {
-      width: 100%;
-      height: 56vh;
-      border: none;
-      background: #0f172a;
+    .legal-pane {
       display: none;
     }
-    .legal-iframe.active {
+    .legal-pane.active {
       display: block;
+    }
+    .legal-pane h3 {
+      color: #38bdf8;
+      font-size: 13.5px;
+      margin: 14px 0 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .legal-pane h3:first-child {
+      margin-top: 0;
+    }
+    .legal-pane p {
+      margin: 0 0 8px;
+    }
+    .legal-pane ul {
+      margin: 4px 0 10px;
+      padding-right: 18px;
+    }
+    .legal-pane li {
+      margin-bottom: 6px;
+    }
+    .legal-pane code {
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .legal-disclosure-alert {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid #38bdf8;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .legal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+      margin: 8px 0 12px;
+    }
+    .legal-table th,
+    .legal-table td {
+      border: 1px solid #334155;
+      padding: 7px 8px;
+      text-align: start;
+      vertical-align: top;
+    }
+    .legal-table th {
+      background: #1e293b;
+      color: #38bdf8;
+    }
+    .legal-en-block {
+      direction: ltr;
+      text-align: left;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px dashed #334155;
+    }
+    .legal-en-block ul {
+      padding-right: 0;
+      padding-left: 18px;
+    }
+    .legal-ltr {
+      direction: ltr;
+      unicode-bidi: embed;
+      display: inline-block;
+      color: #38bdf8;
     }
     .legal-modal-footer {
       padding: 10px 14px;
@@ -130,6 +192,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
+      flex-shrink: 0;
     }
     .legal-consent-note {
       font-size: 10.5px;
@@ -438,7 +501,7 @@
     </footer>
   </div>
 
-  <!-- نافذة سياسة الخصوصية والأذونات وبنود الخدمة (تظهر تلقائياً في أول تشغيل وعند الضغط على الزر) -->
+  <!-- نافذة سياسة الخصوصية والأذونات وبنود الخدمة (تعمل أوفلاين بالكامل بدون iframe) -->
   <div id="legalConsentModal" class="legal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle">
     <div class="legal-modal-card">
       <div class="legal-modal-header">
@@ -447,23 +510,127 @@
       </div>
 
       <div class="legal-nav-pills">
-        <button type="button" class="legal-pill active" data-legal-view="summary">ملخص سريع</button>
-        <button type="button" class="legal-pill" data-legal-view="privacy-policy.html">سياسة الخصوصية</button>
-        <button type="button" class="legal-pill" data-legal-view="permissions.html">إفصاح الأذونات</button>
-        <button type="button" class="legal-pill" data-legal-view="terms.html">بنود الخدمة</button>
+        <button type="button" class="legal-pill active" data-legal-pane="paneSummary">ملخص سريع</button>
+        <button type="button" class="legal-pill" data-legal-pane="panePrivacy">سياسة الخصوصية</button>
+        <button type="button" class="legal-pill" data-legal-pane="panePermissions">إفصاح الأذونات</button>
+        <button type="button" class="legal-pill" data-legal-pane="paneTerms">بنود الخدمة</button>
       </div>
 
-      <div id="legalSummaryBox" class="legal-summary-box">
-        <p style="margin-top:0;">مرحباً بك في <strong>Pr3 stydeo pro</strong>. قبل البدء، يرجى الاطلاع على مبادئ الخصوصية والأذونات:</p>
-        <ul>
-          <li><strong>الخصوصية الكاملة (Offline):</strong> جميع الفواتير والصور والملفات تُعالج محلياً داخل هاتفك ولا يتم رفعها أو مشاركتها مع أي خادم خارجي.</li>
-          <li><strong>أذونات البلوتوث فقط:</strong> تُستخدم حصرياً للاتصال بطابعتك الحرارية (<code>neverForLocation</code>) دون طلب أو تتبع موقعك الجغرافي GPS.</li>
-          <li><strong>بنود الخدمة:</strong> التطبيق أداة مستقلة غير تابعة لشركة Honeywell أو Intermec، والمستخدم مسؤول عن محتوى الفواتير المطبوعة.</li>
-        </ul>
-        <p style="margin-bottom:0; color:#94a3b8; font-size:11px;">يمكنك قراءة النص الكامل لكل وثيقة من التبويبات بالأعلى في أي وقت.</p>
-      </div>
+      <div id="legalBodyScroll" class="legal-body-scroll">
+        <!-- 1. ملخص سريع -->
+        <div id="paneSummary" class="legal-pane active">
+          <p>مرحباً بك في <strong>Pr3 stydeo pro</strong>. قبل البدء، يرجى الاطلاع على مبادئ الخصوصية والأذونات:</p>
+          <ul>
+            <li><strong>الخصوصية الكاملة (Offline):</strong> جميع الفواتير والصور والملفات تُعالج محلياً داخل هاتفك ولا يتم رفعها أو مشاركتها مع أي خادم خارجي.</li>
+            <li><strong>أذونات البلوتوث فقط:</strong> تُستخدم حصرياً للاتصال بطابعتك الحرارية (<code>neverForLocation</code>) دون طلب أو تتبع موقعك الجغرافي GPS.</li>
+            <li><strong>بنود الخدمة:</strong> التطبيق أداة مستقلة غير تابعة لشركة Honeywell أو Intermec، والمستخدم مسؤول عن محتوى الفواتير المطبوعة.</li>
+          </ul>
+          <p style="color:#94a3b8; font-size:11px; margin-bottom:0;">اضغط على أي تبويب بالأعلى لقراءة النص الكامل بالعربية والإنجليزية.</p>
+        </div>
 
-      <iframe id="legalFrame" class="legal-iframe" title="عرض الوثيقة القانونية"></iframe>
+        <!-- 2. سياسة الخصوصية -->
+        <div id="panePrivacy" class="legal-pane">
+          <h3>سياسة الخصوصية (Privacy Policy) — Pr3 stydeo pro</h3>
+          <p>نحن نحترم خصوصيتك ونلتزم بحمايتها. توضح هذه السياسة كيفية تعامل تطبيق <strong>Pr3 stydeo pro</strong> (المطور: <strong>Karam.apk</strong>) مع البيانات والصلاحيات:</p>
+
+          <h3>1. جمع البيانات والمعالجة المحلية</h3>
+          <p><strong>لا يقوم التطبيق بجمع أو تخزين أو مشاركة أي بيانات شخصية أو فواتير أو مستندات على أي خوادم خارجية.</strong> تتم جميع عمليات معالجة النصوص والصور وملفات الـ PDF محلياً بالكامل داخل ذاكرة هاتفك لإرسالها إلى الطابعة فقط، ويتم مسحها من الذاكرة المؤقتة فور انتهاء الطباعة.</p>
+
+          <h3>2. الصلاحيات المستخدمة</h3>
+          <ul>
+            <li><strong>البلوتوث (<code>BLUETOOTH_CONNECT</code> / <code>BLUETOOTH_SCAN</code>):</strong> للاتصال بالطابعات الحرارية المقترنة بهاتفك فقط مع تفعيل <code>neverForLocation</code> ودون جمع أي بيانات موقع GPS.</li>
+            <li><strong>مشاركة الملفات والصور:</strong> قراءة مؤقتة للملف المشارك لتحويله إلى أوامر طباعة دون الاحتفاظ به.</li>
+            <li><strong>الإنترنت (<code>INTERNET</code>):</strong> لفتح الروابط الموثوقة (<code>karamegy.github.io</code>) وصفحات المساعدة عند طلب المستخدم فقط.</li>
+          </ul>
+
+          <h3>3. مشاركة البيانات والتواصل</h3>
+          <p>لا نبيع ولا نشارك أي بيانات مع أي أطراف ثالثة أو شركات إعلانية. للتواصل مع المطور:</p>
+          <ul>
+            <li>البريد الأساسي: <span class="legal-ltr">haretg@gmail.com</span></li>
+            <li>البريد البديل: <span class="legal-ltr">Eelkady188@gmail.com</span></li>
+            <li>الهاتف / واتساب: <span class="legal-ltr">+201114099799</span></li>
+          </ul>
+
+          <div class="legal-en-block">
+            <h3>Privacy Policy (English) — Pr3 stydeo pro</h3>
+            <p><strong>We do not collect, store, transmit, or share any personal data, invoices, images, or documents on external servers.</strong> All Arabic text shaping, PDF rendering, and image conversion happen strictly locally on your Android device.</p>
+            <ul>
+              <li><strong>Bluetooth (<code>BLUETOOTH_CONNECT</code>, <code>BLUETOOTH_SCAN</code>):</strong> Used strictly to connect to paired thermal printers with <code>neverForLocation</code> enabled; physical location is never accessed.</li>
+              <li><strong>Shared Files:</strong> Processed temporarily in local memory for printing and immediately discarded.</li>
+              <li><strong>Contact:</strong> <span class="legal-ltr">haretg@gmail.com</span> | <span class="legal-ltr">Eelkady188@gmail.com</span> | <span class="legal-ltr">+201114099799</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 3. إفصاح الأذونات -->
+        <div id="panePermissions" class="legal-pane">
+          <div class="legal-disclosure-alert">
+            <strong>إفصاح بارز (Prominent Disclosure):</strong><br />
+            يستخدم تطبيق <strong>Pr3 stydeo pro</strong> أذونات البلوتوث والأجهزة القريبة <strong>حصرياً</strong> للاتصال بطابعات الإيصالات الحرارية المقترنة بهاتفك وإرسال أوامر الطباعة إليها، مع تعطيل تحديد الموقع الجغرافي بالكامل (<code>neverForLocation</code>).
+          </div>
+
+          <h3>جدول الأذونات المطلوبة في التطبيق</h3>
+          <table class="legal-table">
+            <thead>
+              <tr>
+                <th>الإذن (Permission)</th>
+                <th>سبب الاستخدام الفعلي</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>BLUETOOTH_CONNECT</code></td>
+                <td>الاتصال المباشر بالطابعات الحرارية المقترنة في بلوتوث الهاتف وإرسال بيانات الطباعة.</td>
+              </tr>
+              <tr>
+                <td><code>BLUETOOTH_SCAN</code><br /><small>(<code>neverForLocation</code>)</small></td>
+                <td>البحث عن طابعات البلوتوث القريبة فقط مع منع استنتاج الموقع الجغرافي.</td>
+              </tr>
+              <tr>
+                <td><code>BLUETOOTH</code> &amp; <code>BLUETOOTH_ADMIN</code></td>
+                <td>دعم التوافق مع أندرويد 11 فأقدم (<code>maxSdkVersion="30"</code>).</td>
+              </tr>
+              <tr>
+                <td><code>BIND_PRINT_SERVICE</code></td>
+                <td>تسجيل <code>PR3PrintService</code> كخدمة طباعة رسمية في نظام أندرويد.</td>
+              </tr>
+              <tr>
+                <td><code>INTERNET</code></td>
+                <td>فتح الروابط الموثوقة (<code>karamegy.github.io</code>) وصفحات السياسة عند الطلب.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>أذونات لا يطلبها التطبيق نهائياً</h3>
+          <p>لا يطلب التطبيق الوصول إلى الموقع الجغرافي (GPS)، الكاميرا، الميكروفون، جهات الاتصال، أو الوصول الشامل لذاكرة التخزين.</p>
+
+          <div class="legal-en-block">
+            <h3>Permissions Disclosure (English)</h3>
+            <p><strong>Pr3 stydeo pro</strong> uses Bluetooth permissions solely to discover and connect to paired thermal receipt printers (<code>neverForLocation</code>). The app never requests Location (GPS), Contacts, Camera, Microphone, or broad storage permissions (<code>MANAGE_EXTERNAL_STORAGE</code>).</p>
+          </div>
+        </div>
+
+        <!-- 4. بنود الخدمة -->
+        <div id="paneTerms" class="legal-pane">
+          <h3>بنود وشروط الخدمة (Terms of Service) — Pr3 stydeo pro</h3>
+          <p>باستخدامك لتطبيق <strong>Pr3 stydeo pro</strong>، فإنك توافق على الشروط التالية:</p>
+          <ul>
+            <li><strong>الترخيص والاستخدام:</strong> يُمنح لك ترخيص شخصي وتجاري غير حصري لاستخدام التطبيق في طباعة الفواتير والإيصالات والملفات محلياً.</li>
+            <li><strong>مسؤولية المحتوى:</strong> يتحمل المستخدم وحده المسؤولية القانونية والتجارية الكاملة عن صحة البيانات والأسعار والشعارات التي يطبعها.</li>
+            <li><strong>إخلاء مسؤولية العلامات التجارية:</strong> التطبيق منتج مستقل من تطوير <strong>Karam.apk</strong>، وهو <strong>غير تابع أو معتمد رسمياً</strong> من شركة Honeywell أو Intermec أو أي شركة مصنعة للطابعات.</li>
+            <li><strong>حدود المسؤولية:</strong> يُقدَّم التطبيق "كما هو" (As-Is)، ولا يتحمل المطور أي مسؤولية عن أعطال البطارية أو نفاد الورق أو انقطاع اتصال البلوتوث.</li>
+          </ul>
+
+          <div class="legal-en-block">
+            <h3>Terms of Service (English)</h3>
+            <ul>
+              <li><strong>License:</strong> Non-exclusive personal and commercial license for local receipt and document printing.</li>
+              <li><strong>User Responsibility:</strong> You are solely responsible for the accuracy and legality of the content you print.</li>
+              <li><strong>Trademark Disclaimer:</strong> <strong>Pr3 stydeo pro</strong> is an independent utility by <strong>Karam.apk</strong> and is not affiliated with or endorsed by Honeywell, Intermec, or any printer manufacturer.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       <div class="legal-modal-footer">
         <span id="legalConsentNote" class="legal-consent-note">بمتابعتك، فإنك توافق على سياسة الخصوصية وبنود الخدمة.</span>
@@ -482,24 +649,18 @@
       const btnClose = document.getElementById('btnCloseLegalModal');
       const btnAccept = document.getElementById('btnAcceptLegal');
       const consentNote = document.getElementById('legalConsentNote');
-      const summaryBox = document.getElementById('legalSummaryBox');
-      const iframe = document.getElementById('legalFrame');
+      const bodyScroll = document.getElementById('legalBodyScroll');
       const pills = document.querySelectorAll('.legal-pill');
+      const panes = document.querySelectorAll('.legal-pane');
 
-      function switchLegalView(target) {
-        pills.forEach(p => p.classList.toggle('active', p.dataset.legalView === target));
-        if (target === 'summary') {
-          iframe.classList.remove('active');
-          summaryBox.style.display = 'block';
-        } else {
-          summaryBox.style.display = 'none';
-          iframe.src = target;
-          iframe.classList.add('active');
-        }
+      function switchLegalPane(paneId) {
+        pills.forEach(p => p.classList.toggle('active', p.dataset.legalPane === paneId));
+        panes.forEach(pane => pane.classList.toggle('active', pane.id === paneId));
+        if (bodyScroll) bodyScroll.scrollTop = 0;
       }
 
       function openLegalModal(isFirstRun) {
-        switchLegalView('summary');
+        switchLegalPane('paneSummary');
         if (isFirstRun) {
           btnClose.style.display = 'none';
           btnAccept.style.display = 'inline-block';
@@ -513,7 +674,7 @@
       }
 
       pills.forEach(pill => {
-        pill.addEventListener('click', () => switchLegalView(pill.dataset.legalView));
+        pill.addEventListener('click', () => switchLegalPane(pill.dataset.legalPane));
       });
 
       btnOpen.addEventListener('click', () => openLegalModal(false));
