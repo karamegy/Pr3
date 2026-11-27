@@ -227,6 +227,8 @@ jobs:
       - name: حقن صلاحيات سامسونج وخدمة الطباعة وتوحيد التوقيع في Android
         run: |
           python3 - << 'PYEOF'
+          import re
+
           manifest_path = "android/app/src/main/AndroidManifest.xml"
           with open(manifest_path, "r", encoding="utf-8") as f:
               manifest = f.read()
@@ -272,6 +274,12 @@ jobs:
           gradle_path = "android/app/build.gradle"
           with open(gradle_path, "r", encoding="utf-8") as f:
               gradle = f.read()
+
+          gradle = re.sub(r'compileSdk(?:Version)?\s*=?\s*[^\n]+', 'compileSdk 36', gradle, count=1)
+          gradle = re.sub(r'minSdk(?:Version)?\s*=?\s*[^\n]+', 'minSdk 24', gradle, count=1)
+          gradle = re.sub(r'targetSdk(?:Version)?\s*=?\s*[^\n]+', 'targetSdk 36', gradle, count=1)
+          gradle = re.sub(r'versionCode\s*=?\s*\d+', 'versionCode 80000', gradle, count=1)
+          gradle = re.sub(r'versionName\s*=?\s*"[^"]+"', 'versionName "8.0.0.0"', gradle, count=1)
 
           signing_block = """
               lint {
