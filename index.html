@@ -7,6 +7,156 @@
   <title>PR3 Thermal Studio Pro | طابعة Intermec PR3</title>
   <link rel="stylesheet" href="style.css" />
   <script src="pdf.min.js" defer></script>
+  <style>
+    /* زر الخصوصية والأذونات المصغر جداً للحفاظ على الواجهة */
+    .brand-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+    .btn-legal-micro {
+      font-size: 9.5px;
+      line-height: 1.1;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.1);
+      color: #94a3b8;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .btn-legal-micro:active,
+    .btn-legal-micro:hover {
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+
+    /* نافذة الخصوصية والشروط عند الفتح الأول وعند الطلب */
+    .legal-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(2, 6, 23, 0.92);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+    }
+    .legal-modal-backdrop.open {
+      display: flex;
+    }
+    .legal-modal-card {
+      width: 100%;
+      max-width: 540px;
+      max-height: 90vh;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+    }
+    .legal-modal-header {
+      padding: 12px 14px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .legal-modal-header h2 {
+      margin: 0;
+      font-size: 14px;
+      color: #38bdf8;
+    }
+    .legal-nav-pills {
+      display: flex;
+      gap: 6px;
+      padding: 8px 12px;
+      background: #0b1120;
+      border-bottom: 1px solid #1e293b;
+      overflow-x: auto;
+    }
+    .legal-pill {
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #cbd5e1;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .legal-pill.active {
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .legal-summary-box {
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #e2e8f0;
+      line-height: 1.6;
+      overflow-y: auto;
+    }
+    .legal-summary-box ul {
+      margin: 6px 0 0;
+      padding-right: 18px;
+    }
+    .legal-summary-box li {
+      margin-bottom: 6px;
+    }
+    .legal-iframe {
+      width: 100%;
+      height: 56vh;
+      border: none;
+      background: #0f172a;
+      display: none;
+    }
+    .legal-iframe.active {
+      display: block;
+    }
+    .legal-modal-footer {
+      padding: 10px 14px;
+      background: #1e293b;
+      border-top: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .legal-consent-note {
+      font-size: 10.5px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+    .btn-legal-accept {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-legal-close {
+      background: transparent;
+      color: #94a3b8;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
   <div class="app-shell">
@@ -15,7 +165,10 @@
       <div class="brand">
         <div class="status-dot" id="statusDot"></div>
         <div>
-          <h1>PR3 Studio Pro</h1>
+          <div class="brand-title-row">
+            <h1>PR3 Studio Pro</h1>
+            <button type="button" id="btnOpenLegal" class="btn-legal-micro" title="سياسة الخصوصية والأذونات وبنود الخدمة">الخصوصية والأذونات</button>
+          </div>
           <span class="sub-status" id="connectionStatus">جاري البحث التلقائي عن PR3...</span>
         </div>
       </div>
@@ -285,7 +438,95 @@
     </footer>
   </div>
 
+  <!-- نافذة سياسة الخصوصية والأذونات وبنود الخدمة (تظهر تلقائياً في أول تشغيل وعند الضغط على الزر) -->
+  <div id="legalConsentModal" class="legal-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle">
+    <div class="legal-modal-card">
+      <div class="legal-modal-header">
+        <h2 id="legalModalTitle">الخصوصية والأذونات وبنود الخدمة</h2>
+        <button type="button" id="btnCloseLegalModal" class="btn-legal-close" style="display:none;">إغلاق ✕</button>
+      </div>
+
+      <div class="legal-nav-pills">
+        <button type="button" class="legal-pill active" data-legal-view="summary">ملخص سريع</button>
+        <button type="button" class="legal-pill" data-legal-view="privacy-policy.html">سياسة الخصوصية</button>
+        <button type="button" class="legal-pill" data-legal-view="permissions.html">إفصاح الأذونات</button>
+        <button type="button" class="legal-pill" data-legal-view="terms.html">بنود الخدمة</button>
+      </div>
+
+      <div id="legalSummaryBox" class="legal-summary-box">
+        <p style="margin-top:0;">مرحباً بك في <strong>Pr3 stydeo pro</strong>. قبل البدء، يرجى الاطلاع على مبادئ الخصوصية والأذونات:</p>
+        <ul>
+          <li><strong>الخصوصية الكاملة (Offline):</strong> جميع الفواتير والصور والملفات تُعالج محلياً داخل هاتفك ولا يتم رفعها أو مشاركتها مع أي خادم خارجي.</li>
+          <li><strong>أذونات البلوتوث فقط:</strong> تُستخدم حصرياً للاتصال بطابعتك الحرارية (<code>neverForLocation</code>) دون طلب أو تتبع موقعك الجغرافي GPS.</li>
+          <li><strong>بنود الخدمة:</strong> التطبيق أداة مستقلة غير تابعة لشركة Honeywell أو Intermec، والمستخدم مسؤول عن محتوى الفواتير المطبوعة.</li>
+        </ul>
+        <p style="margin-bottom:0; color:#94a3b8; font-size:11px;">يمكنك قراءة النص الكامل لكل وثيقة من التبويبات بالأعلى في أي وقت.</p>
+      </div>
+
+      <iframe id="legalFrame" class="legal-iframe" title="عرض الوثيقة القانونية"></iframe>
+
+      <div class="legal-modal-footer">
+        <span id="legalConsentNote" class="legal-consent-note">بمتابعتك، فإنك توافق على سياسة الخصوصية وبنود الخدمة.</span>
+        <button type="button" id="btnAcceptLegal" class="btn-legal-accept">موافق ومتابعة</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
   <script src="app.js"></script>
+  <script>
+    (function () {
+      const STORAGE_KEY = 'pr3_legal_accepted_v1';
+      const modal = document.getElementById('legalConsentModal');
+      const btnOpen = document.getElementById('btnOpenLegal');
+      const btnClose = document.getElementById('btnCloseLegalModal');
+      const btnAccept = document.getElementById('btnAcceptLegal');
+      const consentNote = document.getElementById('legalConsentNote');
+      const summaryBox = document.getElementById('legalSummaryBox');
+      const iframe = document.getElementById('legalFrame');
+      const pills = document.querySelectorAll('.legal-pill');
+
+      function switchLegalView(target) {
+        pills.forEach(p => p.classList.toggle('active', p.dataset.legalView === target));
+        if (target === 'summary') {
+          iframe.classList.remove('active');
+          summaryBox.style.display = 'block';
+        } else {
+          summaryBox.style.display = 'none';
+          iframe.src = target;
+          iframe.classList.add('active');
+        }
+      }
+
+      function openLegalModal(isFirstRun) {
+        switchLegalView('summary');
+        if (isFirstRun) {
+          btnClose.style.display = 'none';
+          btnAccept.style.display = 'inline-block';
+          consentNote.textContent = 'بمتابعتك، فإنك توافق على سياسة الخصوصية وبنود الخدمة.';
+        } else {
+          btnClose.style.display = 'inline-block';
+          btnAccept.style.display = 'none';
+          consentNote.textContent = 'تطبيق Pr3 stydeo pro • المطور: Karam.apk';
+        }
+        modal.classList.add('open');
+      }
+
+      pills.forEach(pill => {
+        pill.addEventListener('click', () => switchLegalView(pill.dataset.legalView));
+      });
+
+      btnOpen.addEventListener('click', () => openLegalModal(false));
+      btnClose.addEventListener('click', () => modal.classList.remove('open'));
+      btnAccept.addEventListener('click', () => {
+        localStorage.setItem(STORAGE_KEY, 'true');
+        modal.classList.remove('open');
+      });
+
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        openLegalModal(true);
+      }
+    })();
+  </script>
 </body>
 </html>
