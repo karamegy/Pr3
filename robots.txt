@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /Pr3/
+Allow: /Pr3/index.html
+Allow: /Pr3/privacy-policy.html
+Allow: /Pr3/permissions.html
+Allow: /Pr3/terms.html
+Allow: /Pr3/style.css
+Allow: /Pr3/app.js
+Allow: /Pr3/.well-known/
+
+# منع أرشفة ملفات البرمجة والبناء الداخلية
+Disallow: /Pr3/.github/
+Disallow: /Pr3/android/
+Disallow: /Pr3/AndroidManifest.xml
+Disallow: /Pr3/MainActivity.java
+Disallow: /Pr3/capacitor.config.json
+Disallow: /Pr3/package.json
+Disallow: /Pr3/sw.js
+Disallow: /Pr3/README.md
+
+Sitemap: https://karamegy.github.io/Pr3/sitemap.xml
