@@ -1265,40 +1265,38 @@ function buildPrinterPayload() {
   const h = state.monoHeight;
   const mono = state.monoBitmap;
 
-  // 1) Intermec PR3 ESC/P الرسمي: ESC V n1 n2 (Big-Endian: n1 = High Byte, n2 = Low Byte)
-  // رأس طباعة PR3 يحتاج دائماً 72 بايت لكل صف، لذا يتم توسيط مقاس 58mm تلقائياً داخل 72 بايت
+  // 1) Intermec PR3 ESC/P الرسمي: أمر ESC V واحد متصل لكامل ارتفاع الصورة
   if (protocol === "INTERMEC_ESCP") {
-    const chunks = [];
-    const BAND_ROWS = 28; // 28 × 72 + 4 = 2020 بايت (تناسب ذاكرة بلوتوث PR3)
     const leftPadBytes = Math.max(0, Math.floor((PR3_HEAD_BYTES - srcBytesPerRow) / 2));
+    const payload = new Uint8Array(4 + h * PR3_HEAD_BYTES + 4);
 
-    for (let yStart = 0; yStart < h; yStart += BAND_ROWS) {
-      const bandHeight = Math.min(BAND_ROWS, h - yStart);
-      const band = new Uint8Array(4 + bandHeight * PR3_HEAD_BYTES);
-      band[0] = 0x1b; // ESC
-      band[1] = 0x56; // V (Intermec Uncompressed Bit-Image Graphics)
-      band[2] = (bandHeight >> 8) & 0xff; // n1 = High Byte (MSB)
-      band[3] = bandHeight & 0xff;        // n2 = Low Byte (LSB)
+    // ترويسة ESC V واحدة لكامل الارتفاع h (Big-Endian)
+    payload[0] = 0x1b; // ESC
+    payload[1] = 0x56; // V
+    payload[2] = (h >> 8) & 0xff; // n1 = High Byte (MSB)
+    payload[3] = h & 0xff;        // n2 = Low Byte (LSB)
 
-      for (let r = 0; r < bandHeight; r++) {
-        const y = yStart + r;
-        const rowOffset = 4 + r * PR3_HEAD_BYTES + leftPadBytes;
-        for (let bx = 0; bx < srcBytesPerRow; bx++) {
-          let byteVal = 0;
-          for (let bit = 0; bit < 8; bit++) {
-            if (mono[y * w + bx * 8 + bit] === 1) {
-              byteVal |= 1 << (7 - bit);
-            }
+    for (let y = 0; y < h; y++) {
+      const rowOffset = 4 + y * PR3_HEAD_BYTES + leftPadBytes;
+      for (let bx = 0; bx < srcBytesPerRow; bx++) {
+        let byteVal = 0;
+        for (let bit = 0; bit < 8; bit++) {
+          if (mono[y * w + bx * 8 + bit] === 1) {
+            byteVal |= 1 << (7 - bit);
           }
-          band[rowOffset + bx] = byteVal;
         }
+        payload[rowOffset + bx] = byteVal;
       }
-      chunks.push(band);
     }
 
-    // تغذية الورق بعد انتهاء الفاتورة
-    chunks.push(new Uint8Array([0x1b, 0x4a, 0x48, 0x0d]));
-    return concatUint8Arrays(chunks);
+    // أمر تغذية الورق في النهاية فقط
+    const endOffset = 4 + h * PR3_HEAD_BYTES;
+    payload[endOffset] = 0x1b;
+    payload[endOffset + 1] = 0x4a;
+    payload[endOffset + 2] = 0x48;
+    payload[endOffset + 3] = 0x0d;
+
+    return payload;
   }
 
   // 2) بروتوكول CPCL (إذا كانت الطابعة محولة إلى CSim)
@@ -1436,7 +1434,9 @@ async function queryPrinterTelemetry() {
 
 async function sendBytesToPrinter(bytes, onProgress) {
   if (window.Capacitor?.Plugins?.PR3Printer) {
-    const CHUNK_SIZE = 2048;
+    const isDither = state.activeTab === "fileTab" && els.ditherSelect.value === "floyd";
+    const CHUNK_SIZE = 512;
+    const DELAY_MS = isDither ? 75 : 45;
     const mac = els.deviceMacInput.value.trim();
 
     for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
@@ -1447,7 +1447,7 @@ async function sendBytesToPrinter(bytes, onProgress) {
         onProgress(Math.min(100, Math.round(((i + slice.length) / bytes.length) * 100)));
       }
       if (i + CHUNK_SIZE < bytes.length) {
-        await new Promise((r) => setTimeout(r, 50));
+        await new Promise((r) => setTimeout(r, DELAY_MS));
       }
     }
 
@@ -1563,4 +1563,4 @@ function showToast(msg) {
   els.toast.classList.add("show");
   clearTimeout(showToast._timer);
   showToast._timer = setTimeout(() => els.toast.classList.remove("show"), 3000);
-                                               }
+}
